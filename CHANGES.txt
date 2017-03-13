@@ -1,4 +1,28 @@
+2.1.18
+ * Log stacktrace of uncaught exceptions (CASSANDRA-13108)
+ * Remove unused repositories (CASSANDRA-13278)
+
+2.1.17
+ * Use portable stderr for java error in startup (CASSANDRA-13211)
+ * Fix Thread Leak in OutboundTcpConnection (CASSANDRA-13204)
+ * Coalescing strategy can enter infinite loop (CASSANDRA-13159)
+ * Upgrade netty version to fix memory leak with client encryption (CASSANDRA-13114)
+ * Fix paging for DISTINCT queries on partition keys and static columns (CASSANDRA-13017)
+ * Fix race causing infinite loop if Thrift server is stopped before it starts listening (CASSANDRA-12856)
+ * cqlsh copy-from: sort user type fields in csv (CASSANDRA-12959)
+ * Fix missed signal when commit log segments are recycled (CASSANDRA-13037)
+ * Fix RecoveryManagerTruncateTest (CASSANDRA-12802)
+ * Don't skip sstables based on maxLocalDeletionTime (CASSANDRA-12765)
+
+
 2.1.16
+ * Avoid infinitely looping result set when paging SELECT queries with
+   an IN clause with duplicate keys by treating the IN values as a set instead
+   of a list (CASSANDRA-12420)
+ * Add system property to set the max number of native transport requests in queue (CASSANDRA-11363)
+ * Include column family parameter when -st and -et are provided (CASSANDRA-11866)
+ * Fix queries with empty ByteBuffer values in clustering column restrictions (CASSANDRA-12127) 
+ * Disable passing control to post-flush after flush failure to prevent data loss (CASSANDRA-11828)
  * Allow STCS-in-L0 compactions to reduce scope with LCS (CASSANDRA-12040)
  * cannot use cql since upgrading python to 2.7.11+ (CASSANDRA-11850)
  * Fix filtering on clustering columns when 2i is used (CASSANDRA-11907)
