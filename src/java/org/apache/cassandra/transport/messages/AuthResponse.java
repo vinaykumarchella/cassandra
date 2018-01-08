@@ -93,4 +93,9 @@ public class AuthResponse extends Message.Request
             return ErrorMessage.fromException(e);
         }
     }
+
+    protected String getAuditString(QueryState queryState)
+    {
+        return toString();
+    }
 }

@@ -42,9 +42,11 @@ import com.google.common.collect.ImmutableSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.config.SchemaConstants;
 import org.apache.cassandra.service.ClientWarn;
 import org.apache.cassandra.transport.messages.*;
 import org.apache.cassandra.service.QueryState;
+import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 
 /**
@@ -221,6 +223,9 @@ public abstract class Message
         {
             return tracingRequested;
         }
+
+        protected String getAuditString(QueryState queryState) {return toString();}
+
     }
 
     public static abstract class Response extends Message
@@ -513,6 +518,29 @@ public abstract class Message
 
                 QueryState qstate = connection.validateNewMessage(request.type, connection.getVersion(), request.getStreamId());
 
+                try
+                {
+                    if(request.type != null && request.type.opcode>=7 && request.type.opcode<=13 && request.type.direction==Direction.REQUEST)
+                    {
+                        if(qstate.getClientState().getRawKeyspace()!=null && !SchemaConstants.isLocalSystemKeyspace(qstate.getClientState().getKeyspace()))
+                        {
+                            logger.info("host:{}|source:{}|user:{}|timestamp:{}|type:{}|ks:{}|cf:{}|request:{}|Direction:{}",
+                                        FBUtilities.getLocalAddress(),
+                                        qstate.getClientState().getRemoteAddress(),
+                                        qstate.getClientState().getUser() == null ? "USER" : qstate.getClientState().getUser().getName(),
+                                        qstate.getTimestamp(),
+                                        request.type,
+                                        qstate.getClientState().getRawKeyspace() == null ? "NULL" : qstate.getClientState().getKeyspace(),
+                                        "CFNAME",
+                                        request.getAuditString(qstate),
+                                        request.type.direction);
+                        }
+                    }
+                }
+                catch (Exception e1)
+                {
+                    logger.error("Unknown exception in trying to log for Auditing. ",e1);
+                }
                 logger.trace("Received: {}, v={}", request, connection.getVersion());
                 response = request.execute(qstate, queryStartNanoTime);
                 response.setStreamId(request.getStreamId());

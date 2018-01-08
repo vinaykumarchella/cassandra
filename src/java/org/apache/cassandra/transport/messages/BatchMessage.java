@@ -233,6 +233,37 @@ public class BatchMessage extends Message.Request
     }
 
     @Override
+    protected String getAuditString(QueryState queryState)
+    {
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("BATCH of [");
+        for (int i = 0; i < queryOrIdList.size(); i++)
+        {
+            if (i > 0) sb.append(", ");
+
+
+            Object query = queryOrIdList.get(i);
+            QueryHandler handler = ClientState.getCQLQueryHandler();
+
+            ParsedStatement.Prepared p;
+            if (query instanceof String)
+            {
+                p = QueryProcessor.parseStatement((String)query, queryState);
+            }
+            else
+            {
+                p = handler.getPrepared((MD5Digest)query);
+                if (p == null)
+                    throw new PreparedQueryNotFoundException((MD5Digest)query);
+            }
+
+            sb.append(queryOrIdList.get(i)).append(" - ").append(p.rawCQLStatement).append(" with ").append(values.get(i).size()).append(" values");
+        }
+        sb.append("] at consistency ").append(options.getConsistency());
+        return sb.toString();    }
+
+    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
@@ -240,9 +271,12 @@ public class BatchMessage extends Message.Request
         for (int i = 0; i < queryOrIdList.size(); i++)
         {
             if (i > 0) sb.append(", ");
+
             sb.append(queryOrIdList.get(i)).append(" with ").append(values.get(i).size()).append(" values");
         }
         sb.append("] at consistency ").append(options.getConsistency());
         return sb.toString();
     }
+
+
 }
