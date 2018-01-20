@@ -1,0 +1,53 @@
+# enable assertions.  disabling this in production will give a modest
+# performance benefit (around 5%).
+-ea
+
+# some JVMs will fill up their heap when accessed via JMX, see CASSANDRA-6541
+-XX:+CMSClassUnloadingEnabled
+# enable thread priorities, primarily so we can give periodic tasks
+# a lower priority to avoid interfering with client workload
+-XX:+UseThreadPriorities
+# allows lowering thread priority without being root.  see
+# http://tech.stolsvik.com/2010/01/linux-java-thread-priorities-workaround.html
+-XX:ThreadPriorityPolicy=42
+
+-XX:+HeapDumpOnOutOfMemoryError
+
+# Per-thread stack size.
+JVM_OPTS="$JVM_OPTS -Xss256k
+
+# Larger interned string table, for gossip's benefit (CASSANDRA-6410)
+JVM_OPTS="$JVM_OPTS -XX:StringTableSize=1000003
+
+# GC tuning options
+-XX:+UseParNewGC
+-XX:+UseConcMarkSweepGC
+-XX:+CMSParallelRemarkEnabled
+-XX:SurvivorRatio=8
+-XX:MaxTenuringThreshold=1
+-XX:CMSInitiatingOccupancyFraction=75
+-XX:+UseCMSInitiatingOccupancyOnly
+-XX:+UseTLAB
+-XX:CMSWaitDuration=10000
+
+# Prefer binding to IPv4 network intefaces (when net.ipv6.bindv6only=1). See
+# http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6342561 (short version:
+# comment out this entry to enable IPv6 support).
+-Djava.net.preferIPv4Stack=true
+
+# Up verbosity on GC logs and others
+-XX:+PrintCommandLineFlags
+-XX:+PrintGCDetails
+-XX:+PrintGCTimeStamps
+-XX:+PrintTenuringDistribution
+-XX:+PrintGCApplicationConcurrentTime
+
+# For more detailed flamegraphs
+-XX:+PreserveFramePointer
+
+-Dcassandra.always_listen_on_unencrypted=true
+
+-XX:MetaspaceSize=256M
+-XX:MaxMetaspaceSize=1024M
+-XX:MinMetaspaceFreeRatio=50
+-XX:MaxMetaspaceFreeRatio=80
