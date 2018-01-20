@@ -23,6 +23,11 @@ if [ "x$CASSANDRA_CONF" = "x" ]; then
     CASSANDRA_CONF="$CASSANDRA_HOME/conf"
 fi
 
+# The directory where Cassandra's logs live (optional)
+if [ "x$CASS_LOGS_DIR" = "x" ]; then
+    export CASS_LOGS_DIR="$CASSANDRA_HOME/logs"
+fi
+
 # This can be the path to a jar file, or a directory containing the 
 # compiled classes. NOTE: This isn't needed by the startup script,
 # it's just used here in constructing the classpath.
