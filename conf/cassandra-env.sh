@@ -163,28 +163,30 @@ fi
 # Specifies the default port over which Cassandra will be available for
 # JMX connections.
 # For security reasons, you should not expose this port to the internet.  Firewall it if needed.
-JMX_PORT="7199"
+JMX_PORT="7501"
 
+JVM_OPTS_FILE=$CASSANDRA_CONF/jvm.options
+for opt in `grep "^-" $JVM_OPTS_FILE`
+do
+  JVM_OPTS="$JVM_OPTS $opt"
+done
 
-# Here we create the arguments that will get passed to the jvm when
-# starting cassandra.
+# Pull in any agents present in CASSANDRA_HOME
+for agent_file in ${CASSANDRA_HOME}/agents/*.jar; do
+  if [ -e "${agent_file}" ]; then
+    JVM_OPTS="$JVM_OPTS -javaagent:${agent_file}"
+  fi
+done
 
-# enable assertions.  disabling this in production will give a modest
-# performance benefit (around 5%).
-JVM_OPTS="$JVM_OPTS -ea"
+for agent_file in ${CASSANDRA_HOME}/agents/*.so; do
+  if [ -e "${agent_file}" ]; then
+    JVM_OPTS="$JVM_OPTS -agentpath:${agent_file}"
+  fi
+done
 
-# add the jamm javaagent
-JVM_OPTS="$JVM_OPTS -javaagent:$CASSANDRA_HOME/lib/jamm-0.3.0.jar"
-
-# some JVMs will fill up their heap when accessed via JMX, see CASSANDRA-6541
-JVM_OPTS="$JVM_OPTS -XX:+CMSClassUnloadingEnabled"
-
-# enable thread priorities, primarily so we can give periodic tasks
-# a lower priority to avoid interfering with client workload
-JVM_OPTS="$JVM_OPTS -XX:+UseThreadPriorities"
-# allows lowering thread priority without being root.  see
-# http://tech.stolsvik.com/2010/01/linux-java-thread-priorities-workaround.html
-JVM_OPTS="$JVM_OPTS -XX:ThreadPriorityPolicy=42"
+# Keep heap dumps and gc logs separated by timestamps
+START_TIMESTAMP=`date +%s`
+JVM_OPTS="$JVM_OPTS -Xloggc:${CASSANDRA_HOME}/logs/${START_TIMESTAMP}-gc.log"
 
 # min and max heap sizes should be set to the same value to avoid
 # stop-the-world GC pauses during resize, and so that we can lock the
@@ -193,33 +195,15 @@ JVM_OPTS="$JVM_OPTS -XX:ThreadPriorityPolicy=42"
 JVM_OPTS="$JVM_OPTS -Xms${MAX_HEAP_SIZE}"
 JVM_OPTS="$JVM_OPTS -Xmx${MAX_HEAP_SIZE}"
 JVM_OPTS="$JVM_OPTS -Xmn${HEAP_NEWSIZE}"
-JVM_OPTS="$JVM_OPTS -XX:+HeapDumpOnOutOfMemoryError"
 
 # set jvm HeapDumpPath with CASSANDRA_HEAPDUMP_DIR
 if [ "x$CASSANDRA_HEAPDUMP_DIR" != "x" ]; then
-    JVM_OPTS="$JVM_OPTS -XX:HeapDumpPath=$CASSANDRA_HEAPDUMP_DIR/cassandra-`date +%s`-pid$$.hprof"
+    JVM_OPTS="$JVM_OPTS -XX:HeapDumpPath=$CASSANDRA_HEAPDUMP_DIR/cassandra-${START_TIMESTAMP}-pid$$.hprof"
 fi
-
 
 startswith() { [ "${1#$2}" != "$1" ]; }
 
-# Per-thread stack size.
-JVM_OPTS="$JVM_OPTS -Xss256k"
-
-# Larger interned string table, for gossip's benefit (CASSANDRA-6410)
-JVM_OPTS="$JVM_OPTS -XX:StringTableSize=1000003"
-
-# GC tuning options
-JVM_OPTS="$JVM_OPTS -XX:+UseParNewGC" 
-JVM_OPTS="$JVM_OPTS -XX:+UseConcMarkSweepGC" 
-JVM_OPTS="$JVM_OPTS -XX:+CMSParallelRemarkEnabled" 
-JVM_OPTS="$JVM_OPTS -XX:SurvivorRatio=8" 
-JVM_OPTS="$JVM_OPTS -XX:MaxTenuringThreshold=1"
-JVM_OPTS="$JVM_OPTS -XX:CMSInitiatingOccupancyFraction=75"
-JVM_OPTS="$JVM_OPTS -XX:+UseCMSInitiatingOccupancyOnly"
-JVM_OPTS="$JVM_OPTS -XX:+UseTLAB"
 JVM_OPTS="$JVM_OPTS -XX:CompileCommandFile=$CASSANDRA_CONF/hotspot_compiler"
-JVM_OPTS="$JVM_OPTS -XX:CMSWaitDuration=10000"
 
 # note: bash evals '1.7.x' as > '1.7' so this is really a >= 1.7 jvm check
 if { [ "$JVM_VERSION" \> "1.7" ] && [ "$JVM_VERSION" \< "1.8.0" ] && [ "$JVM_PATCH_VERSION" -ge "60" ]; } || [ "$JVM_VERSION" \> "1.8" ] ; then
