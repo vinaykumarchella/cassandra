@@ -86,6 +86,15 @@ calculate_heap_sizes()
     fi
 }
 
+# Needed to pick up any environment variables set by, e.g. Priam
+set -e
+for file in ${ADDITIONAL_ENVVARS}; do
+  while IFS= read -r line; do
+    export "$line"
+  done < "${file}"
+done
+set +e
+
 # Determine the sort of JVM we'll be running on.
 
 java_ver_output=`"${JAVA:-java}" -version 2>&1`
@@ -183,6 +192,8 @@ for agent_file in ${CASSANDRA_HOME}/agents/*.so; do
     JVM_OPTS="$JVM_OPTS -agentpath:${agent_file}"
   fi
 done
+
+JVM_OPTS="$JVM_OPTS -Djava.rmi.server.hostname='$EC2_PUBLIC_HOSTNAME'"
 
 # Keep heap dumps and gc logs separated by timestamps
 START_TIMESTAMP=`date +%s`
