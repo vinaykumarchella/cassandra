@@ -1,6 +1,6 @@
 # enable assertions.  disabling this in production will give a modest
 # performance benefit (around 5%).
--ea
+# -ea
 
 # some JVMs will fill up their heap when accessed via JMX, see CASSANDRA-6541
 -XX:+CMSClassUnloadingEnabled
@@ -28,7 +28,10 @@ JVM_OPTS="$JVM_OPTS -XX:StringTableSize=1000003
 -XX:CMSInitiatingOccupancyFraction=75
 -XX:+UseCMSInitiatingOccupancyOnly
 -XX:+UseTLAB
+-XX:+ResizeTLAB
 -XX:CMSWaitDuration=10000
+-XX:+AlwaysPreTouch
+-XX:-UseBiasedLocking
 
 # Prefer binding to IPv4 network intefaces (when net.ipv6.bindv6only=1). See
 # http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6342561 (short version:
