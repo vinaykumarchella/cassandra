@@ -1,6 +1,6 @@
 # enable assertions.  disabling this in production will give a modest
 # performance benefit (around 5%).
-# -ea
+-ea
 
 # some JVMs will fill up their heap when accessed via JMX, see CASSANDRA-6541
 -XX:+CMSClassUnloadingEnabled
