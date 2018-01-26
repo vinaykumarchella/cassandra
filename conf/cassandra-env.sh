@@ -252,11 +252,6 @@ fi
 # uncomment to have Cassandra JVM log internal method compilation (developers only)
 # JVM_OPTS="$JVM_OPTS -XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation"
 
-# Prefer binding to IPv4 network intefaces (when net.ipv6.bindv6only=1). See
-# http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6342561 (short version:
-# comment out this entry to enable IPv6 support).
-JVM_OPTS="$JVM_OPTS -Djava.net.preferIPv4Stack=true"
-
 # jmx: metrics and administration interface
 #
 # add this if you're having trouble connecting:
