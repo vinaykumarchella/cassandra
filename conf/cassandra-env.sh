@@ -197,7 +197,7 @@ JVM_OPTS="$JVM_OPTS -Djava.rmi.server.hostname='$EC2_PUBLIC_HOSTNAME'"
 
 # Keep heap dumps and gc logs separated by timestamps
 START_TIMESTAMP=`date +%s`
-JVM_OPTS="$JVM_OPTS -Xloggc:${CASSANDRA_HOME}/logs/cassandra-${START_TIMESTAMP}-gc.log"
+JVM_OPTS="$JVM_OPTS -Xloggc:${CASS_LOGS_DIR}/cassandra-${START_TIMESTAMP}-gc.log"
 
 # min and max heap sizes should be set to the same value to avoid
 # stop-the-world GC pauses during resize, and so that we can lock the
