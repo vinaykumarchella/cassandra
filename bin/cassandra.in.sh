@@ -45,9 +45,7 @@ cassandra_storagedir="$CASSANDRA_HOME/data"
 # The java classpath (required)
 CLASSPATH="$CASSANDRA_CONF:$cassandra_bin"
 
-for jar in "$CASSANDRA_HOME"/lib/*.jar; do
-    CLASSPATH="$CLASSPATH:$jar"
-done
+CLASSPATH="$CLASSPATH:$CASSANDRA_HOME/lib/*"
 
 # set JVM javaagent opts to avoid warnings/errors
 if [ "$JVM_VENDOR" != "OpenJDK" -o "$JVM_VERSION" \> "1.6.0" ] \

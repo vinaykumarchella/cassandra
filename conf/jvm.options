@@ -1,6 +1,6 @@
 # enable assertions.  disabling this in production will give a modest
 # performance benefit (around 5%).
-# -ea
+-ea
 
 # some JVMs will fill up their heap when accessed via JMX, see CASSANDRA-6541
 -XX:+CMSClassUnloadingEnabled
@@ -14,10 +14,10 @@
 -XX:+HeapDumpOnOutOfMemoryError
 
 # Per-thread stack size.
-JVM_OPTS="$JVM_OPTS -Xss256k
+-Xss256k
 
 # Larger interned string table, for gossip's benefit (CASSANDRA-6410)
-JVM_OPTS="$JVM_OPTS -XX:StringTableSize=1000003
+-XX:StringTableSize=1000003
 
 # GC tuning options
 -XX:+UseParNewGC
@@ -42,8 +42,10 @@ JVM_OPTS="$JVM_OPTS -XX:StringTableSize=1000003
 -XX:+PrintCommandLineFlags
 -XX:+PrintGCDetails
 -XX:+PrintGCTimeStamps
+-XX:+PrintGCDateStamps
 -XX:+PrintTenuringDistribution
 -XX:+PrintGCApplicationConcurrentTime
+-XX:+PrintGCApplicationStoppedTime
 
 # For more detailed flamegraphs
 -XX:+PreserveFramePointer

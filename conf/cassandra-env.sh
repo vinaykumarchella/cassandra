@@ -183,12 +183,22 @@ done
 # Pull in any agents present in CASSANDRA_HOME
 for agent_file in ${CASSANDRA_HOME}/agents/*.jar; do
   if [ -e "${agent_file}" ]; then
+    base_file="${agent_file%.jar}"
+    if [ -s "${base_file}.options" ]; then
+      options=`cat ${base_file}.options`
+      agent_file="${agent_file}=${options}"
+    fi
     JVM_OPTS="$JVM_OPTS -javaagent:${agent_file}"
   fi
 done
 
 for agent_file in ${CASSANDRA_HOME}/agents/*.so; do
   if [ -e "${agent_file}" ]; then
+    base_file="${agent_file%.so}"
+    if [ -s "${base_file}.options" ]; then
+      options=`cat ${base_file}.options`
+      agent_file="${agent_file}=${options}"
+    fi
     JVM_OPTS="$JVM_OPTS -agentpath:${agent_file}"
   fi
 done
@@ -197,7 +207,7 @@ JVM_OPTS="$JVM_OPTS -Djava.rmi.server.hostname='$EC2_PUBLIC_HOSTNAME'"
 
 # Keep heap dumps and gc logs separated by timestamps
 START_TIMESTAMP=`date +%s`
-JVM_OPTS="$JVM_OPTS -Xloggc:${CASSANDRA_HOME}/logs/${START_TIMESTAMP}-gc.log"
+JVM_OPTS="$JVM_OPTS -Xloggc:${CASS_LOGS_DIR}/cassandra-${START_TIMESTAMP}-gc.log"
 
 # min and max heap sizes should be set to the same value to avoid
 # stop-the-world GC pauses during resize, and so that we can lock the
@@ -251,11 +261,6 @@ fi
 
 # uncomment to have Cassandra JVM log internal method compilation (developers only)
 # JVM_OPTS="$JVM_OPTS -XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation"
-
-# Prefer binding to IPv4 network intefaces (when net.ipv6.bindv6only=1). See
-# http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6342561 (short version:
-# comment out this entry to enable IPv6 support).
-JVM_OPTS="$JVM_OPTS -Djava.net.preferIPv4Stack=true"
 
 # jmx: metrics and administration interface
 #
