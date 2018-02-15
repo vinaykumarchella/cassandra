@@ -1,4 +1,22 @@
+2.1.21
+ * CVE-2017-5929 Security vulnerability in Logback warning in NEWS.txt (CASSANDRA-14183)
+
+2.1.20
+ * Protect against overflow of local expiration time (CASSANDRA-14092)
+ * More PEP8 compliance for cqlsh (CASSANDRA-14021)
+ * RPM package spec: fix permissions for installed jars and config files (CASSANDRA-14181)
+
+2.1.19
+ * Add storage port options to sstableloader (CASSANDRA-13844)
+ * Remove stress-test target in CircleCI as it's not existing (CASSANDRA-13775) 
+ * Clone HeartBeatState when building gossip messages. Make its generation/version volatile (CASSANDRA-13700)
+
+
 2.1.18
+ * Fix 2ndary indexes on primary key columns to don't create expiring entries (CASSANDRA-13412)
+ * Set javac encoding to utf-8 (CASSANDRA-13466)
+ * Fix 2ndary index queries on partition keys for tables with static columns (CASSANDRA-13147)
+ * Fix ParseError unhashable type list in cqlsh copy from (CASSANDRA-13364)
  * Log stacktrace of uncaught exceptions (CASSANDRA-13108)
  * Remove unused repositories (CASSANDRA-13278)
 

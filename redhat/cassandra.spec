@@ -2,10 +2,13 @@
 # Turn off the brp-python-bytecompile script
 %global __os_install_post %(echo '%{__os_install_post}' | sed -e 's!/usr/lib[^[:space:]]*/brp-python-bytecompile[[:space:]].*$!!g')
 
+# rpmbuild should not barf when it spots we ship
+# binary executable files in our 'noarch' package
+%define _binaries_in_noarch_packages_terminate_build   0
+
 %global username cassandra
 
 %define relname apache-cassandra-%{version}
-%define revision 1
 
 Name:          cassandra
 Version:       %{version}
@@ -18,7 +21,7 @@ URL:           http://cassandra.apache.org/
 Source0:       %{relname}-src.tar.gz
 BuildRoot:     %{_tmppath}/%{relname}root-%(%{__id_u} -n)
 
-BuildRequires: ant
+BuildRequires: ant >= 1.9
 
 Requires:      jre >= 1.7.0
 Requires:      python(abi) >= 2.7
@@ -123,10 +126,10 @@ exit 0
 %attr(755,root,root) %{_bindir}/stop-server
 %attr(755,root,root) %{_sbindir}/cassandra
 %attr(755,root,root) /%{_sysconfdir}/rc.d/init.d/%{username}
-%attr(755,root,root) /%{_sysconfdir}/default/%{username}
-%attr(755,root,root) /%{_sysconfdir}/security/limits.d/%{username}.conf
-%attr(755,%{username},%{username}) /usr/share/%{username}*
-%attr(755,%{username},%{username}) %config(noreplace) /%{_sysconfdir}/%{username}
+%{_sysconfdir}/default/%{username}
+%{_sysconfdir}/security/limits.d/%{username}.conf
+/usr/share/%{username}*
+%config(noreplace) /%{_sysconfdir}/%{username}
 %attr(755,%{username},%{username}) %config(noreplace) /var/lib/%{username}/*
 %attr(755,%{username},%{username}) /var/log/%{username}*
 %attr(755,%{username},%{username}) /var/run/%{username}*

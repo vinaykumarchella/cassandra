@@ -552,6 +552,29 @@ public class SecondaryIndexTest extends CQLTester
     }
 
     @Test
+    public void testIndexOnPartitionKeyWithStaticColumnAndNoRows() throws Throwable
+    {
+        createTable("CREATE TABLE %s (pk1 int, pk2 int, c int, s int static, v int, PRIMARY KEY((pk1, pk2), c))");
+        createIndex("CREATE INDEX ON %s (pk2)");
+        execute("INSERT INTO %s (pk1, pk2, c, s, v) VALUES (?, ?, ?, ?, ?)", 1, 1, 1, 9, 1);
+        execute("INSERT INTO %s (pk1, pk2, c, s, v) VALUES (?, ?, ?, ?, ?)", 1, 1, 2, 9, 2);
+        execute("INSERT INTO %s (pk1, pk2, s) VALUES (?, ?, ?)", 2, 1, 9);
+        execute("INSERT INTO %s (pk1, pk2, c, s, v) VALUES (?, ?, ?, ?, ?)", 3, 1, 1, 9, 1);
+
+        assertRows(execute("SELECT * FROM %s WHERE pk2 = ?", 1),
+                   row(2, 1, null, 9, null),
+                   row(1, 1, 1, 9, 1),
+                   row(1, 1, 2, 9, 2),
+                   row(3, 1, 1, 9, 1));
+
+        execute("UPDATE %s SET s=?, v=? WHERE pk1=? AND pk2=? AND c=?", 9, 1, 1, 10, 2);
+        assertRows(execute("SELECT * FROM %s WHERE pk2 = ?", 10), row(1, 10, 2, 9, 1));
+
+        execute("UPDATE %s SET s=? WHERE pk1=? AND pk2=?", 9, 1, 20);
+        assertRows(execute("SELECT * FROM %s WHERE pk2 = ?", 20), row(1, 20, null, 9, null));
+    }
+
+    @Test
     public void testIndexOnClusteringColumnInsertValueOver64k() throws Throwable
     {
         createTable("CREATE TABLE %s(a int, b int, c blob, PRIMARY KEY (a, b))");
@@ -780,5 +803,62 @@ public class SecondaryIndexTest extends CQLTester
 
         assertRows(execute("SELECT * FROM %s WHERE v = textAsBlob('');"),
                    row(bytes("foo124"), EMPTY_BYTE_BUFFER));
+    }
+
+    @Test
+    public void testIndexOnRegularColumnWithPartitionWithoutRows() throws Throwable
+    {
+        createTable("CREATE TABLE %s (pk int, c int, s int static, v int, PRIMARY KEY(pk, c))");
+        createIndex("CREATE INDEX ON %s (v)");
+        execute("INSERT INTO %s (pk, c, s, v) VALUES (?, ?, ?, ?)", 1, 1, 9, 1);
+        execute("INSERT INTO %s (pk, c, s, v) VALUES (?, ?, ?, ?)", 1, 2, 9, 2);
+        execute("INSERT INTO %s (pk, s) VALUES (?, ?)", 2, 9);
+        execute("INSERT INTO %s (pk, c, s, v) VALUES (?, ?, ?, ?)", 3, 1, 9, 1);
+        flush();
+        execute("DELETE FROM %s WHERE pk = ? and c = ?", 3, 1);
+        assertRows(execute("SELECT * FROM %s WHERE v = ?", 1),
+                   row(1, 1, 9, 1));
+    }
+
+    @Test
+    public void testIndexOnPartitionKeyInsertExpiringColumn() throws Throwable
+    {
+        createTable("CREATE TABLE %s (k1 int, k2 int, a int, b int, PRIMARY KEY ((k1, k2)))");
+        createIndex("CREATE INDEX on %s(k1)");
+        execute("INSERT INTO %s (k1, k2, a, b) VALUES (1, 2, 3, 4)");
+        assertRows(execute("SELECT * FROM %s WHERE k1 = 1"), row(1, 2, 3, 4));
+        execute("UPDATE %s USING TTL 1 SET b = 10 WHERE k1 = 1 AND k2 = 2");
+        Thread.sleep(1000);
+        assertRows(execute("SELECT * FROM %s WHERE k1 = 1"), row(1, 2, 3, null));
+    }
+
+    @Test
+    public void testIndexOnClusteringKeyInsertExpiringColumn() throws Throwable
+    {
+        createTable("CREATE TABLE %s (pk int, ck int, a int, b int, PRIMARY KEY (pk, ck))");
+        createIndex("CREATE INDEX on %s(ck)");
+        execute("INSERT INTO %s (pk, ck, a, b) VALUES (1, 2, 3, 4)");
+        assertRows(execute("SELECT * FROM %s WHERE ck = 2"), row(1, 2, 3, 4));
+        execute("UPDATE %s USING TTL 1 SET b = 10 WHERE pk = 1 AND ck = 2");
+        Thread.sleep(1000);
+        assertRows(execute("SELECT * FROM %s WHERE ck = 2"), row(1, 2, 3, null));
+    }
+
+    @Test
+    public void testIndexOnRegularColumnInsertExpiringColumn() throws Throwable
+    {
+        createTable("CREATE TABLE %s (pk int, ck int, a int, b int, PRIMARY KEY (pk, ck))");
+        createIndex("CREATE INDEX on %s(a)");
+        execute("INSERT INTO %s (pk, ck, a, b) VALUES (1, 2, 3, 4)");
+        assertRows(execute("SELECT * FROM %s WHERE a = 3"), row(1, 2, 3, 4));
+
+        execute("UPDATE %s USING TTL 1 SET b = 10 WHERE pk = 1 AND ck = 2");
+        Thread.sleep(1000);
+        assertRows(execute("SELECT * FROM %s WHERE a = 3"), row(1, 2, 3, null));
+
+        execute("UPDATE %s USING TTL 1 SET a = 5 WHERE pk = 1 AND ck = 2");
+        Thread.sleep(1000);
+        assertEmpty(execute("SELECT * FROM %s WHERE a = 3"));
+        assertEmpty(execute("SELECT * FROM %s WHERE a = 5"));
     }
 }
