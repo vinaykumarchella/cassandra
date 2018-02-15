@@ -21,8 +21,6 @@ import java.util.Collection;
 import java.util.UUID;
 
 import org.apache.cassandra.db.partitions.PartitionUpdate;
-import org.apache.cassandra.service.ClientState;
-import org.apache.cassandra.service.QueryState;
 
 public interface IMutation
 {
@@ -33,7 +31,4 @@ public interface IMutation
     public long getTimeout();
     public String toString(boolean shallow);
     public Collection<PartitionUpdate> getPartitionUpdates();
-
-    public ClientState getState();
-
 }

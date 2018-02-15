@@ -23,7 +23,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
-import java.util.stream.Collectors;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
@@ -492,11 +491,7 @@ public class Keyspace
             throw new RuntimeException("Testing write failures");
 
         Lock[] locks = null;
-        if(!SchemaConstants.isLocalSystemKeyspace(mutation.getKeyspaceName()))
-        {
-            List<String> cfNames = mutation.getColumnFamilyIds().stream().map(uuid -> Schema.instance.getCF(uuid).right).collect(Collectors.toList());
-            logger.info("Mutation to KS: [{}], table: [{}]", mutation.getKeyspaceName(), cfNames);
-        }
+
         boolean requiresViewUpdate = updateIndexes && viewManager.updatesAffectView(Collections.singleton(mutation), false);
 
         if (requiresViewUpdate)
@@ -628,8 +623,6 @@ public class Keyspace
                 UpdateTransaction indexTransaction = updateIndexes
                                                      ? cfs.indexManager.newUpdateTransaction(upd, opGroup, nowInSec)
                                                      : UpdateTransaction.NO_OP;
-
-                //Audit log entry goes here
                 cfs.apply(upd, indexTransaction, opGroup, commitLogPosition);
                 if (requiresViewUpdate)
                     baseComplete.set(System.currentTimeMillis());
