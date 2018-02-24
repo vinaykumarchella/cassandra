@@ -20,9 +20,6 @@ package org.apache.cassandra.audit;
 import java.util.LinkedList;
 import java.util.Queue;
 
-/**
- * @author vchella
- */
 public class InMemoryAuditLogger implements IAuditLogger
 {
     public static InMemoryAuditLogger instance = null;
