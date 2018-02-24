@@ -157,4 +157,8 @@ public final class DropAggregateStatement extends SchemaAlteringStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
+    public FunctionName getFunctionName()
+    {
+        return functionName;
+    }
 }

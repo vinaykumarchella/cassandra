@@ -1184,3 +1184,19 @@ back_pressure_strategy:
 # automatic_sstable_upgrade: false
 # Limit the number of concurrent sstable upgrades
 # max_concurrent_automatic_sstable_upgrades: 1
+
+# Audit logging - Logs every incoming CQL command request, Authentication (successful as well as unsuccessful login)
+# to C* node. Currently there is only one implementation "FileAuditLogger" which logs events to audit/audit.log file
+# using C* logging impelementation (logback) Custom logger can be implemented and injected here with the class name.
+# system keyspaces are excluded from audit log.
+# enabled: This option enables/ disables audit log
+# logger: Class name of the logger/ custom logger
+# includedKeyspaces: comma separated list of keyspaces to be included for audit log, default - includes all keysapces
+# excludedKeyspaces: comma separated list of keyspaces to be excluded for audit log, default - excludes no keysapce
+# includedCategories: comma separated list of Audit Log Categories to be included for audit log, default - includes all categories
+# excludedCategories: comma separated list of Audit Log Categories to be excluded for audit log, default - excludes no category
+# List of available categories are found in org.apache.cassandra.audit.AuditLogEntryType.java file
+audit_logging_options:
+    enabled: false
+    logger: FileAuditLogger
+

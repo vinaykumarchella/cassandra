@@ -676,4 +676,8 @@ public interface StorageServiceMBean extends NotificationEmitter
 
     /** Clears the history of clients that have connected in the past **/
     void clearConnectionHistory();
+    public void disableAuditLog();
+    public void enableAuditLog();
+    public boolean isAuditLogEnabled();
+    public void reloadAuditLogFilters();
 }

@@ -188,4 +188,8 @@ public final class CreateFunctionStatement extends SchemaAlteringStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
+    public FunctionName getFunctionName()
+    {
+        return functionName;
+    }
 }

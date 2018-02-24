@@ -22,15 +22,13 @@ import java.util.UUID;
 import com.google.common.collect.ImmutableMap;
 import io.netty.buffer.ByteBuf;
 
+import org.apache.cassandra.audit.AuditLogEntry;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.ColumnSpecification;
 import org.apache.cassandra.cql3.QueryHandler;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.ResultSet;
-import org.apache.cassandra.cql3.statements.BatchStatement;
-import org.apache.cassandra.cql3.statements.ModificationStatement;
 import org.apache.cassandra.cql3.statements.ParsedStatement;
-import org.apache.cassandra.cql3.statements.UpdateStatement;
 import org.apache.cassandra.db.fullquerylog.FullQueryLogger;
 import org.apache.cassandra.exceptions.PreparedQueryNotFoundException;
 import org.apache.cassandra.service.ClientState;
@@ -109,6 +107,7 @@ public class ExecuteMessage extends Message.Request
 
     public Message.Response execute(QueryState state, long queryStartNanoTime)
     {
+        AuditLogEntry auditLogEntry = null;
         try
         {
             QueryHandler handler = ClientState.getCQLQueryHandler();
@@ -160,6 +159,11 @@ public class ExecuteMessage extends Message.Request
                 Tracing.instance.begin("Execute CQL3 prepared query", state.getClientAddress(), builder.build());
             }
 
+            if(auditLogEnabled)
+            {
+                auditLogEntry  = auditLogManager.getLogEntry(statement, prepared.rawCQLStatement, state, options);
+            }
+
             // Some custom QueryHandlers are interested by the bound names. We provide them this information
             // by wrapping the QueryOptions.
             QueryOptions queryOptions = QueryOptions.addColumnSpecifications(options, prepared.boundNames);
@@ -170,6 +174,12 @@ public class ExecuteMessage extends Message.Request
                 fqlTime = System.currentTimeMillis();
             }
             Message.Response response = handler.processPrepared(statement, state, queryOptions, getCustomPayload(), queryStartNanoTime);
+
+            if(auditLogEnabled)
+            {
+                auditLogManager.log(auditLogEntry);
+            }
+
             if (fqlEnabled)
             {
                 FullQueryLogger.instance.logQuery(prepared.rawCQLStatement, options, fqlTime);
@@ -212,6 +222,7 @@ public class ExecuteMessage extends Message.Request
         }
         catch (Exception e)
         {
+            auditLogManager.log(auditLogEntry, e);
             JVMStabilityInspector.inspectThrowable(e);
             return ErrorMessage.fromException(e);
         }

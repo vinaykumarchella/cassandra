@@ -188,10 +188,13 @@ public final class DropFunctionStatement extends SchemaAlteringStatement
         }
         return old;
     }
-    
     @Override
     public String toString()
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
+    }
+    public FunctionName getFunctionName()
+    {
+        return functionName;
     }
 }

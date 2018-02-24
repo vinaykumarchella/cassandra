@@ -266,4 +266,8 @@ public final class CreateAggregateStatement extends SchemaAlteringStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
+    public FunctionName getFunctionName()
+    {
+        return functionName;
+    }
 }

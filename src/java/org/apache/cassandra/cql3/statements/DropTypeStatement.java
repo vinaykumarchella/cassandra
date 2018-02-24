@@ -122,10 +122,15 @@ public class DropTypeStatement extends SchemaAlteringStatement
         MigrationManager.announceTypeDrop(toDrop, isLocalOnly);
         return new Event.SchemaChange(Event.SchemaChange.Change.DROPPED, Event.SchemaChange.Target.TYPE, keyspace(), name.getStringTypeName());
     }
-    
+
     @Override
     public String toString()
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
+    }
+
+    public String getStringTypeName()
+    {
+        return name.getStringTypeName();
     }
 }
