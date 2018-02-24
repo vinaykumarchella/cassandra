@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.exceptions.RequestValidationException;
+import org.apache.cassandra.service.QueryState;
 
 public abstract class ParsedStatement
 {
@@ -42,6 +43,14 @@ public abstract class ParsedStatement
 
     public static class Prepared
     {
+        /**
+         * Contains the CQL statement source if the statement has been "regularly" perpared via
+         * {@link org.apache.cassandra.cql3.QueryProcessor#prepare(String, QueryState)}  /
+         * {@link QueryHandler#prepare(String, QueryState)}.
+         * Other usages of this class may or may not contain the CQL statement source.
+         */
+        public String rawCQLStatement;
+
         public final CQLStatement statement;
         public final List<ColumnSpecification> boundNames;
 

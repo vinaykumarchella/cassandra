@@ -52,6 +52,10 @@ Upgrading
 2.1.19
 ======
 
+New features
+------------
+   - Support for audit logging of database activity. If enabled, logs every incoming
+     CQL command request, Authentication (successful as well as unsuccessful login) to a node.
 Upgrading
 ---------
     - Nothing specific to this release, but please see 2.1 if you are upgrading

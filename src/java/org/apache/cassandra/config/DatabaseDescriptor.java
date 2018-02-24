@@ -46,6 +46,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.cassandra.auth.AllowAllAuthenticator;
 import org.apache.cassandra.auth.AllowAllAuthorizer;
+
+import org.apache.cassandra.audit.AuditLogOptions;
 import org.apache.cassandra.auth.AllowAllInternodeAuthenticator;
 import org.apache.cassandra.auth.IAuthenticator;
 import org.apache.cassandra.auth.IAuthorizer;
@@ -1722,4 +1724,11 @@ public class DatabaseDescriptor
         return conf.gc_warn_threshold_in_ms;
     }
 
+    public static AuditLogOptions getAuditLoggingOptions() {
+        return conf.audit_logging_options;
+    }
+
+    public static void setAuditLoggingOptions(AuditLogOptions auditLoggingOptions) {
+        conf.audit_logging_options = auditLoggingOptions;
+    }
 }

@@ -19,6 +19,7 @@ package org.apache.cassandra.cql3.statements;
 
 import java.util.*;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.auth.*;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.cql3.ColumnIdentifier;
@@ -119,5 +120,11 @@ public class ListPermissionsStatement extends AuthorizationStatement
     throws RequestValidationException, RequestExecutionException
     {
         return DatabaseDescriptor.getAuthorizer().list(state.getUser(), permissions, resource, username);
+    }
+
+    @Override
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.LIST_PERMISSIONS);
     }
 }

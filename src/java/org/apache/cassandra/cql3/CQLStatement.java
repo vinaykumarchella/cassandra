@@ -18,11 +18,12 @@
 package org.apache.cassandra.cql3;
 
 import org.apache.cassandra.transport.messages.ResultMessage;
+import org.apache.cassandra.audit.IAuditLogContext;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.exceptions.*;
 
-public interface CQLStatement
+public interface CQLStatement extends IAuditLogContext
 {
     /**
      * Returns the number of bound terms in this statement.

@@ -24,12 +24,15 @@ import java.util.UUID;
 import com.google.common.collect.ImmutableMap;
 import io.netty.buffer.ByteBuf;
 
+import org.apache.cassandra.audit.AuditLogEntry;
+import org.apache.cassandra.audit.AuditLogManager;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.QueryHandler;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.statements.ParsedStatement;
 import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.exceptions.PreparedQueryNotFoundException;
+import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.transport.*;
@@ -130,12 +133,28 @@ public class ExecuteMessage extends Message.Request
                     builder.put("consistency_level", options.getConsistency().name());
                 if(options.getSerialConsistency() != null)
                     builder.put("serial_consistency_level", options.getSerialConsistency().name());
-
                 // TODO we don't have [typed] access to CQL bind variables here.  CASSANDRA-4560 is open to add support.
                 Tracing.instance.begin("Execute CQL3 prepared query", builder.build());
             }
 
+            // Some custom QueryHandlers are interested by the bound names. We provide them this information
+            // by wrapping the QueryOptions.
+
+            long fqlTime = isLoggingEnabled ? System.currentTimeMillis() : 0;
             Message.Response response = handler.processPrepared(statement, state, options);
+
+            if (isLoggingEnabled)
+            {
+                AuditLogEntry auditEntry = new AuditLogEntry.Builder(state.getClientState())
+                                           .setType(statement.getAuditLogContext().auditLogEntryType)
+                                           .setOperation(prepared.rawCQLStatement)
+                                           .setTimestamp(fqlTime)
+                                           .setScope(statement)
+                                           .setKeyspace(state, statement)
+                                           .setOptions(options)
+                                           .build();
+                AuditLogManager.getInstance().log(auditEntry);
+            }
             if (options.skipMetadata() && response instanceof ResultMessage.Rows)
                 ((ResultMessage.Rows)response).result.metadata.setSkipMetadata();
 
@@ -146,6 +165,33 @@ public class ExecuteMessage extends Message.Request
         }
         catch (Exception e)
         {
+            if (auditLogEnabled)
+            {
+                if (e instanceof PreparedQueryNotFoundException)
+                {
+                    AuditLogEntry auditLogEntry = new AuditLogEntry.Builder(state.getClientState())
+                                                  .setOperation(toString())
+                                                  .setOptions(options)
+                                                  .build();
+                    auditLogManager.log(auditLogEntry, e);
+                }
+                else
+                {
+                    ParsedStatement.Prepared prepared = ClientState.getCQLQueryHandler().getPrepared(statementId);
+                    if (prepared != null)
+                    {
+                        AuditLogEntry auditLogEntry = new AuditLogEntry.Builder(state.getClientState())
+                                                      .setOperation(toString())
+                                                      .setType(prepared.statement.getAuditLogContext().auditLogEntryType)
+                                                      .setScope(prepared.statement)
+                                                      .setKeyspace(state, prepared.statement)
+                                                      .setOptions(options)
+                                                      .build();
+                        auditLogManager.log(auditLogEntry, e);
+                    }
+                }
+            }
+
             JVMStabilityInspector.inspectThrowable(e);
             return ErrorMessage.fromException(e);
         }

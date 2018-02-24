@@ -90,6 +90,8 @@ import org.apache.cassandra.service.StorageProxyMBean;
 import org.apache.cassandra.streaming.ProgressInfo;
 import org.apache.cassandra.streaming.SessionInfo;
 import org.apache.cassandra.streaming.StreamState;
+import org.apache.cassandra.tools.nodetool.DisableAuditLog;
+import org.apache.cassandra.tools.nodetool.EnableAuditLog;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.commons.lang3.ArrayUtils;
@@ -189,7 +191,9 @@ public class NodeTool
                 TpStats.class,
                 TopPartitions.class,
                 SetLoggingLevel.class,
-                GetLoggingLevels.class
+                GetLoggingLevels.class,
+                EnableAuditLog.class,
+                DisableAuditLog.class
         );
 
         Cli<Runnable> parser = Cli.<Runnable>builder("nodetool")

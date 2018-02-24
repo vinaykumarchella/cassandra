@@ -20,6 +20,8 @@ package org.apache.cassandra.cql3.statements;
 
 import java.util.Set;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
+import org.apache.cassandra.audit.IAuditLogContext;
 import org.apache.cassandra.auth.IResource;
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.config.DatabaseDescriptor;
@@ -39,5 +41,10 @@ public class GrantStatement extends PermissionAlteringStatement
     {
         DatabaseDescriptor.getAuthorizer().grant(state.getUser(), permissions, resource, username);
         return null;
+    }
+
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.GRANT);
     }
 }

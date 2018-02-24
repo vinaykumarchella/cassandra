@@ -24,7 +24,11 @@ import java.util.UUID;
 import com.google.common.collect.ImmutableMap;
 import io.netty.buffer.ByteBuf;
 
+import org.apache.cassandra.audit.AuditLogEntry;
+import org.apache.cassandra.audit.AuditLogManager;
 import org.apache.cassandra.cql3.QueryOptions;
+import org.apache.cassandra.cql3.QueryProcessor;
+import org.apache.cassandra.cql3.statements.ParsedStatement;
 import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.exceptions.*;
 import org.apache.cassandra.service.QueryState;
@@ -119,7 +123,24 @@ public class QueryMessage extends Message.Request
                 Tracing.instance.begin("Execute CQL3 query", builder.build());
             }
 
+            long fqlTime = isLoggingEnabled ? System.currentTimeMillis() : 0;
             Message.Response response = state.getClientState().getCQLQueryHandler().process(query, state, options);
+
+            if (isLoggingEnabled)
+            {
+                ParsedStatement.Prepared parsedStatement = QueryProcessor.parseStatement(query, state);
+                AuditLogEntry auditEntry = new AuditLogEntry.Builder(state.getClientState())
+                                           .setType(parsedStatement.statement.getAuditLogContext().auditLogEntryType)
+                                           .setOperation(query)
+                                           .setTimestamp(fqlTime)
+                                           .setScope(parsedStatement.statement)
+                                           .setKeyspace(state, parsedStatement.statement)
+                                           .setOptions(options)
+                                           .build();
+                AuditLogManager.getInstance().log(auditEntry);
+
+            }
+
             if (options.skipMetadata() && response instanceof ResultMessage.Rows)
                 ((ResultMessage.Rows)response).result.metadata.setSkipMetadata();
 
@@ -130,6 +151,14 @@ public class QueryMessage extends Message.Request
         }
         catch (Exception e)
         {
+            if (auditLogEnabled)
+            {
+                AuditLogEntry auditLogEntry = new AuditLogEntry.Builder(state.getClientState())
+                                              .setOperation(query)
+                                              .setOptions(options)
+                                              .build();
+                auditLogManager.log(auditLogEntry, e);
+            }
             JVMStabilityInspector.inspectThrowable(e);
             if (!((e instanceof RequestValidationException) || (e instanceof RequestExecutionException)))
                 logger.error("Unexpected error during query", e);
