@@ -5370,4 +5370,22 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         DatabaseDescriptor.setHintedHandoffThrottleInKB(throttleInKB);
         logger.info("Updated hinted_handoff_throttle_in_kb to {}", throttleInKB);
     }
+
+    public void disableAuditLog()
+    {
+        logger.info("Disabling AuditLog");
+        DatabaseDescriptor.setAuditLogEnabled(false);
+    }
+
+    public void enableAuditLog()
+    {
+        logger.info("Enabling AuditLog");
+        DatabaseDescriptor.setAuditLogEnabled(true);
+    }
+
+    public boolean isAuditLogEnabled()
+    {
+        return DatabaseDescriptor.getAuditLoggingOptions().enabled;
+    }
+
 }

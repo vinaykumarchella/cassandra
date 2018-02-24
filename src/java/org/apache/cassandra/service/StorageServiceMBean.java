@@ -660,4 +660,8 @@ public interface StorageServiceMBean extends NotificationEmitter
      * @return true if the node successfully starts resuming. (this does not mean bootstrap streaming was success.)
      */
     public boolean resumeBootstrap();
+
+    public void disableAuditLog();
+    public void enableAuditLog();
+    public boolean isAuditLogEnabled();
 }

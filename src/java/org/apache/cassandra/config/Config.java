@@ -32,6 +32,7 @@ import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.audit.AuditLogOptions;
 import org.apache.cassandra.db.ConsistencyLevel;
 
 /**
@@ -372,6 +373,9 @@ public class Config
     public int repair_command_pool_size = concurrent_validations;
 
     public String full_query_log_dir = null;
+
+    public volatile AuditLogOptions audit_logging_options = new AuditLogOptions();
+
 
     /**
      * @deprecated migrate to {@link DatabaseDescriptor#isClientInitialized()}

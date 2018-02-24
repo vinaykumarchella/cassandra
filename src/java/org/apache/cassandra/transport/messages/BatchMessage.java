@@ -26,6 +26,8 @@ import java.util.UUID;
 import com.google.common.collect.ImmutableMap;
 import io.netty.buffer.ByteBuf;
 
+import org.apache.cassandra.audit.AuditLogEntry;
+import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.cql3.statements.BatchStatement;
 import org.apache.cassandra.cql3.statements.ModificationStatement;
@@ -237,6 +239,11 @@ public class BatchMessage extends Message.Request
             {
                 FullQueryLogger.instance.logBatch(batchType.name(), queryStrings, values, options, fqlTime);
             }
+            if(auditLogEnabled)
+            {
+                List<AuditLogEntry> events = auditLogManager.getEventsForBatch(queryOrIdList, prepared, state, options);
+                auditLogManager.log(events);
+            }
 
             if (tracingId != null)
                 response.setTracingId(tracingId);
@@ -245,6 +252,12 @@ public class BatchMessage extends Message.Request
         }
         catch (Exception e)
         {
+            if(auditLogEnabled)
+            {
+                AuditLogEntry event = auditLogManager.getEvent(getAuditString(), state, this.options);
+                event.setType(AuditLogEntryType.BATCH);
+                auditLogManager.log(event, state.getClientState(), e);
+            }
             JVMStabilityInspector.inspectThrowable(e);
             return ErrorMessage.fromException(e);
         }
@@ -265,6 +278,16 @@ public class BatchMessage extends Message.Request
             sb.append(queryOrIdList.get(i)).append(" with ").append(values.get(i).size()).append(" values");
         }
         sb.append("] at consistency ").append(options.getConsistency());
+        return sb.toString();
+    }
+
+    private String getAuditString()
+    {
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("BATCH of [");
+        sb.append(queryOrIdList.size());
+        sb.append("] statements  at consistency ").append(options.getConsistency());
         return sb.toString();
     }
 }

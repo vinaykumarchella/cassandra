@@ -22,6 +22,7 @@ import java.util.UUID;
 import com.google.common.collect.ImmutableMap;
 import io.netty.buffer.ByteBuf;
 
+import org.apache.cassandra.audit.AuditLogEntry;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.ColumnSpecification;
 import org.apache.cassandra.cql3.QueryHandler;
@@ -109,6 +110,7 @@ public class ExecuteMessage extends Message.Request
 
     public Message.Response execute(QueryState state, long queryStartNanoTime)
     {
+        AuditLogEntry auditLogEntry = null;
         try
         {
             QueryHandler handler = ClientState.getCQLQueryHandler();
@@ -160,6 +162,11 @@ public class ExecuteMessage extends Message.Request
                 Tracing.instance.begin("Execute CQL3 prepared query", state.getClientAddress(), builder.build());
             }
 
+            if(auditLogEnabled)
+            {
+                auditLogEntry  = auditLogManager.getEvent(statement, prepared.rawCQLStatement, state, options);
+            }
+
             // Some custom QueryHandlers are interested by the bound names. We provide them this information
             // by wrapping the QueryOptions.
             QueryOptions queryOptions = QueryOptions.addColumnSpecifications(options, prepared.boundNames);
@@ -170,6 +177,12 @@ public class ExecuteMessage extends Message.Request
                 fqlTime = System.currentTimeMillis();
             }
             Message.Response response = handler.processPrepared(statement, state, queryOptions, getCustomPayload(), queryStartNanoTime);
+
+            if(auditLogEnabled)
+            {
+                auditLogManager.log(auditLogEntry);
+            }
+
             if (fqlEnabled)
             {
                 FullQueryLogger.instance.logQuery(prepared.rawCQLStatement, options, fqlTime);
@@ -212,6 +225,7 @@ public class ExecuteMessage extends Message.Request
         }
         catch (Exception e)
         {
+            auditLogManager.log(auditLogEntry, state.getClientState(), e);
             JVMStabilityInspector.inspectThrowable(e);
             return ErrorMessage.fromException(e);
         }

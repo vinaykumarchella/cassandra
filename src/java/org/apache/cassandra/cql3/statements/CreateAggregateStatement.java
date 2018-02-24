@@ -258,4 +258,9 @@ public final class CreateAggregateStatement extends SchemaAlteringStatement
         r.addAll(argTypes);
         return r;
     }
+
+    public FunctionName getFunctionName()
+    {
+        return functionName;
+    }
 }
