@@ -19,6 +19,10 @@ package org.apache.cassandra.cql3.statements;
 
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.auth.Permission;
+import java.util.regex.Pattern;
+
+import org.apache.cassandra.audit.AuditLogEntryType;
+import org.apache.cassandra.auth.*;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.exceptions.AlreadyExistsException;
@@ -115,5 +119,11 @@ public class CreateKeyspaceStatement extends SchemaAlteringStatement
     public Event.SchemaChange changeEvent()
     {
         return new Event.SchemaChange(Event.SchemaChange.Change.CREATED, keyspace());
+    }
+
+    @Override
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.CREATE_KEYSPACE, keyspace());
     }
 }

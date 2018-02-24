@@ -69,6 +69,7 @@ import org.apache.cassandra.db.HintedHandOffManager;
 import org.apache.cassandra.db.HintedHandOffManagerMBean;
 import org.apache.cassandra.db.compaction.CompactionManager;
 import org.apache.cassandra.db.compaction.CompactionManagerMBean;
+import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.gms.FailureDetector;
 import org.apache.cassandra.gms.FailureDetectorMBean;
 import org.apache.cassandra.locator.EndpointSnitchInfoMBean;
@@ -1309,6 +1310,24 @@ public class NodeProbe implements AutoCloseable
     public Map<String, String> getLoggingLevels()
     {
         return ssProxy.getLoggingLevels();
+    }
+    
+    public void disableAuditLog() {
+        ssProxy.disableAuditLog();
+    }
+
+    public void enableAuditLog(String loggerName, String includedKeyspaces, String excludedKeyspaces,
+            String includedCategories, String excludedCategories, String includedUsers, String excludedUsers)
+    {
+        try
+        {
+            ssProxy.enableAuditLog(loggerName, includedKeyspaces, excludedKeyspaces, includedCategories, excludedCategories,
+                    includedUsers, excludedUsers);
+        }
+        catch (ConfigurationException e)
+        {
+            throw new RuntimeException(e.getMessage(), e);
+        }
     }
 }
 

@@ -22,6 +22,7 @@ import java.util.*;
 
 import com.google.common.collect.Iterators;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.ColumnDefinition;
@@ -29,6 +30,8 @@ import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.composites.Composite;
 import org.apache.cassandra.exceptions.*;
 import org.apache.cassandra.utils.Pair;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 
 /**
  * A <code>DELETE</code> parsed from a CQL query statement.
@@ -155,5 +158,16 @@ public class DeleteStatement extends ModificationStatement
             stmt.processWhereClause(whereClause, boundNames);
             return stmt;
         }
+    }
+    
+    @Override
+    public String toString()
+    {
+        return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
+    }
+    @Override
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.DELETE, keyspace(), columnFamily());
     }
 }

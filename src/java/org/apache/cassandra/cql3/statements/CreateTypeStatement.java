@@ -20,6 +20,7 @@ package org.apache.cassandra.cql3.statements;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.config.*;
 import org.apache.cassandra.cql3.*;
@@ -129,5 +130,11 @@ public class CreateTypeStatement extends SchemaAlteringStatement
         checkForDuplicateNames(type);
         MigrationManager.announceNewType(type, isLocalOnly);
         return true;
+    }
+
+    @Override
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.CREATE_TYPE, keyspace(), name.getStringTypeName());
     }
 }

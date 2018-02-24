@@ -28,6 +28,8 @@ import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
+import org.apache.cassandra.audit.IAuditLogContext;
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.cql3.statements.Restriction.Slice;
@@ -314,6 +316,11 @@ public class SelectStatement implements CQLStatement
         return processResults(rows, options, limit, now);
     }
 
+    @Override
+    public AuditLogContext getAuditLogContext() {
+        return new AuditLogContext(AuditLogEntryType.SELECT, keyspace(), cfm.cfName);
+    }
+    
     private ResultMessage.Rows pageCountQuery(QueryPager pager, QueryOptions options, int pageSize, long now, int limit) throws RequestValidationException, RequestExecutionException
     {
         int count = 0;
