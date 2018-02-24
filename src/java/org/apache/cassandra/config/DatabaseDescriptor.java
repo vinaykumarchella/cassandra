@@ -36,6 +36,7 @@ import com.google.common.primitives.Longs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.audit.AuditLogOptions;
 import org.apache.cassandra.auth.AllowAllInternodeAuthenticator;
 import org.apache.cassandra.auth.AuthConfig;
 import org.apache.cassandra.auth.IAuthenticator;
@@ -2531,5 +2532,15 @@ public class DatabaseDescriptor
     public static int getBlockForPeersTimeoutInSeconds()
     {
         return conf.block_for_peers_timeout_in_secs;
+    }
+    public static AuditLogOptions getAuditLoggingOptions() { return conf.audit_logging_options;}
+
+    public static boolean setAuditLogEnabled(boolean auditLogEnabled)
+    {
+        return conf.audit_logging_options.enabled = auditLogEnabled;
+    }
+    public static void setAuditLoggingOptions(AuditLogOptions auditLoggingOptions)
+    {
+        conf.audit_logging_options = auditLoggingOptions;
     }
 }

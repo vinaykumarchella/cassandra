@@ -51,6 +51,7 @@ import ch.qos.logback.classic.jmx.JMXConfiguratorMBean;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.Appender;
 import ch.qos.logback.core.hook.DelayingShutdownHook;
+import org.apache.cassandra.audit.AuditLogFilter;
 import org.apache.cassandra.auth.AuthKeyspace;
 import org.apache.cassandra.auth.AuthSchemaChangeListener;
 import org.apache.cassandra.batchlog.BatchRemoveVerbHandler;
@@ -5372,5 +5373,27 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
     {
         DatabaseDescriptor.setHintedHandoffThrottleInKB(throttleInKB);
         logger.info("Updated hinted_handoff_throttle_in_kb to {}", throttleInKB);
+    }
+
+    public void disableAuditLog()
+    {
+        logger.info("Disabling AuditLog");
+        DatabaseDescriptor.setAuditLogEnabled(false);
+    }
+
+    public void enableAuditLog()
+    {
+        logger.info("Enabling AuditLog");
+        DatabaseDescriptor.setAuditLogEnabled(true);
+    }
+
+    public boolean isAuditLogEnabled()
+    {
+        return DatabaseDescriptor.getAuditLoggingOptions().enabled;
+    }
+
+    public void reloadAuditLogFilters()
+    {
+        AuditLogFilter.getInstance().loadFilters();
     }
 }
