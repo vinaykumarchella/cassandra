@@ -22,7 +22,10 @@ import java.util.UUID;
 import com.google.common.collect.ImmutableMap;
 
 import io.netty.buffer.ByteBuf;
+import org.apache.cassandra.audit.AuditLogEntry;
 import org.apache.cassandra.cql3.QueryOptions;
+import org.apache.cassandra.cql3.QueryProcessor;
+import org.apache.cassandra.cql3.statements.ParsedStatement;
 import org.apache.cassandra.db.fullquerylog.FullQueryLogger;
 import org.apache.cassandra.exceptions.RequestExecutionException;
 import org.apache.cassandra.exceptions.RequestValidationException;
@@ -86,6 +89,8 @@ public class QueryMessage extends Message.Request
 
     public Message.Response execute(QueryState state, long queryStartNanoTime)
     {
+        AuditLogEntry auditEntry = null;
+
         try
         {
             if (options.getPageSize() == 0)
@@ -120,11 +125,21 @@ public class QueryMessage extends Message.Request
             {
                 fqlTime = System.currentTimeMillis();
             }
+            if(auditLogEnabled)
+            {
+                ParsedStatement.Prepared parsedStmt = QueryProcessor.parseStatement(query, state.getClientState());
+                auditEntry = auditLogManager.getLogEntry(parsedStmt.statement, query, state, options);
+            }
             Message.Response response = ClientState.getCQLQueryHandler().process(query, state, options, getCustomPayload(), queryStartNanoTime);
             if (fqlEnabled)
             {
                 FullQueryLogger.instance.logQuery(query, options, fqlTime);
             }
+            if(auditLogEnabled)
+            {
+                auditLogManager.log(auditEntry);
+            }
+
             if (options.skipMetadata() && response instanceof ResultMessage.Rows)
                 ((ResultMessage.Rows)response).result.metadata.setSkipMetadata();
 
@@ -135,6 +150,7 @@ public class QueryMessage extends Message.Request
         }
         catch (Exception e)
         {
+            auditLogManager.log(auditEntry, e);
             JVMStabilityInspector.inspectThrowable(e);
             if (!((e instanceof RequestValidationException) || (e instanceof RequestExecutionException)))
                 logger.error("Unexpected error during query", e);

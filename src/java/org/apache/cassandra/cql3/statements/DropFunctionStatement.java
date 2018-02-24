@@ -186,4 +186,9 @@ public final class DropFunctionStatement extends SchemaAlteringStatement
         }
         return old;
     }
+
+    public FunctionName getFunctionName()
+    {
+        return functionName;
+    }
 }

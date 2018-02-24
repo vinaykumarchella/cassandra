@@ -132,4 +132,9 @@ public class CreateTypeStatement extends SchemaAlteringStatement
         MigrationManager.announceNewType(type, isLocalOnly);
         return new Event.SchemaChange(Event.SchemaChange.Change.CREATED, Event.SchemaChange.Target.TYPE, keyspace(), name.getStringTypeName());
     }
+
+    public String getStringTypeName()
+    {
+        return name.getStringTypeName();
+    }
 }

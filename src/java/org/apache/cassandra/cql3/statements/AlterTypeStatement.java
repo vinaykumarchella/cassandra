@@ -111,6 +111,11 @@ public abstract class AlterTypeStatement extends SchemaAlteringStatement
                      });
     }
 
+    public String getStringTypeName()
+    {
+        return name.getStringTypeName();
+    }
+
     private static class Add extends AlterTypeStatement
     {
         private final FieldIdentifier fieldName;

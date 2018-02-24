@@ -180,4 +180,9 @@ public final class CreateFunctionStatement extends SchemaAlteringStatement
         AbstractType<?> type = rawType.prepare(functionName.keyspace).getType();
         return type;
     }
+
+    public FunctionName getFunctionName()
+    {
+        return functionName;
+    }
 }
