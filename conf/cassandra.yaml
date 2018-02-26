@@ -1179,6 +1179,6 @@ back_pressure_strategy:
 # includedKeyspaces: comma separated list of keyspaces to be included for audit log, default - includes all keysapces
 # excludedKeyspaces: comma separated list of keyspaces to be excluded for audit log, default - excludes no keysapce
 audit_logging_options:
-    enabled: true
+    enabled: false
     logger: FileAuditLogger
 
