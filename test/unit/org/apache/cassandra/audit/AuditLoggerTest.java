@@ -27,6 +27,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -38,12 +39,11 @@ import com.datastax.driver.core.Session;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.CQLTester;
+import org.apache.cassandra.service.StorageService;
 
 import static org.junit.Assert.assertEquals;
 
-/**
- * @author vchella
- */
+
 public class AuditLoggerTest extends CQLTester
 {
 
@@ -56,6 +56,17 @@ public class AuditLoggerTest extends CQLTester
         options.logger = "InMemoryAuditLogger";
         DatabaseDescriptor.setAuditLoggingOptions(options);
         requireNetwork();
+
+    }
+
+    @Before
+    public void beforeTestMethod() throws Throwable
+    {
+        AuditLogOptions options = new AuditLogOptions();
+        options.enabled = true;
+        options.logger = "InMemoryAuditLogger";
+        DatabaseDescriptor.setAuditLoggingOptions(options);
+        StorageService.instance.reloadAuditLogFilters();
 
     }
 
@@ -86,7 +97,51 @@ public class AuditLoggerTest extends CQLTester
         assertEquals("Following CQLStatements are missing in AuditLogEntryType enum. Please add these missing classes to AuditLogEntryType.allStatementsMap to fix this failing test. Missing classes : " + missingClassNames, 0, missingClasses.size());
     }
 
-        @Test
+
+    @Test
+    public void testAuditLogFilters() throws Throwable
+    {
+        createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
+        execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 1, "Apache", "Cassandra");
+        execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 2, "trace", "test");
+
+        AuditLogOptions options = new AuditLogOptions();
+        options.enabled = true;
+        options.logger = "InMemoryAuditLogger";
+        options.excludedKeyspaces = KEYSPACE;
+        DatabaseDescriptor.setAuditLoggingOptions(options);
+        StorageService.instance.reloadAuditLogFilters();
+
+        String cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
+        ResultSet rs  = executeAndAssertNoAuditLog(cql, 1);
+        assertEquals(1, rs.all().size());
+
+        options = new AuditLogOptions();
+        options.enabled = true;
+        options.logger = "InMemoryAuditLogger";
+        options.includedKeyspaces = KEYSPACE;
+        DatabaseDescriptor.setAuditLoggingOptions(options);
+        StorageService.instance.reloadAuditLogFilters();
+
+        cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
+        rs  = executeAndAssertWithPrepare(cql, AuditLogEntryType.SELECT, 1);
+        assertEquals(1, rs.all().size());
+
+        options = new AuditLogOptions();
+        options.enabled = true;
+        options.logger = "InMemoryAuditLogger";
+        options.includedKeyspaces = KEYSPACE;
+        options.excludedKeyspaces = KEYSPACE;
+        DatabaseDescriptor.setAuditLoggingOptions(options);
+        StorageService.instance.reloadAuditLogFilters();
+
+        cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
+        rs  = executeAndAssertNoAuditLog(cql, 1);
+        assertEquals(1, rs.all().size());
+    }
+
+
+    @Test
     public void testCqlSELECTAuditing() throws Throwable
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
@@ -446,6 +501,17 @@ public class AuditLoggerTest extends CQLTester
         assertLogEntry(cql, exceuteType, logEntry2, isTableNull);
 
         assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
+        return rs;
+    }
+
+    private ResultSet executeAndAssertNoAuditLog(String cql,  Object... bindValues) throws Throwable
+    {
+        Session session = sessionNet();
+
+        PreparedStatement pstmt = session.prepare(cql);
+        ResultSet rs = session.execute(pstmt.bind(bindValues));
+
+        assertEquals(0,((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
         return rs;
     }
 

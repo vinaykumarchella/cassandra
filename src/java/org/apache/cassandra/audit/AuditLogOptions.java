@@ -21,4 +21,6 @@ public class AuditLogOptions
 {
     public boolean enabled = false;
     public String logger = FileAuditLogger.class.getName();
+    public String includedKeyspaces = "";
+    public String excludedKeyspaces = "";
 }

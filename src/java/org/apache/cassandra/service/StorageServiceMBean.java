@@ -664,4 +664,5 @@ public interface StorageServiceMBean extends NotificationEmitter
     public void disableAuditLog();
     public void enableAuditLog();
     public boolean isAuditLogEnabled();
+    public void reloadAuditLogFilters();
 }

@@ -51,6 +51,7 @@ import ch.qos.logback.classic.jmx.JMXConfiguratorMBean;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.Appender;
 import ch.qos.logback.core.hook.DelayingShutdownHook;
+import org.apache.cassandra.audit.AuditLogFilter;
 import org.apache.cassandra.auth.AuthKeyspace;
 import org.apache.cassandra.auth.AuthSchemaChangeListener;
 import org.apache.cassandra.batchlog.BatchRemoveVerbHandler;
@@ -5388,4 +5389,8 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         return DatabaseDescriptor.getAuditLoggingOptions().enabled;
     }
 
+    public void reloadAuditLogFilters()
+    {
+        AuditLogFilter.getInstance().reloadFilters();
+    }
 }

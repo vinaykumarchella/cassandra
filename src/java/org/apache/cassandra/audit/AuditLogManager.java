@@ -56,12 +56,12 @@ public class AuditLogManager
     public static final Logger logger = LoggerFactory.getLogger(AuditLogManager.class);
     private static final AuditLogManager instance = new AuditLogManager();
     private final IAuditLogger auditLogger;
-
     private AuditLogManager()
     {
         if (isAuditingEnabled())
         {
             logger.info("Audit logging is enabled.");
+
         }
         else
         {
@@ -128,7 +128,8 @@ public class AuditLogManager
         // Filter keyspaces
         if (isAuditingEnabled()
             && null != logEntry
-            && (null == logEntry.getKeyspace() || !isSystemKeyspace(logEntry.getKeyspace())))
+            && (null == logEntry.getKeyspace() || !isSystemKeyspace(logEntry.getKeyspace()))
+            && (!AuditLogFilter.getInstance().isFiltered(logEntry.getKeyspace())))
         {
             this.auditLogger.log(logEntry);
         }
