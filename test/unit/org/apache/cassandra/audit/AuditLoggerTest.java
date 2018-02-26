@@ -407,56 +407,6 @@ public class AuditLoggerTest extends CQLTester
     }
 
 
-
-
-
-
-
-
-    /**
-     * Need to be logged in to run these commands,
-     * TODO: Fix the login part for below tests
-     */
-    @Ignore
-    @Test
-    public void testCqlROLEAuditing() throws Throwable
-    {
-
-        String cql = "LIST ROLES ";
-        executeAndAssert(cql, AuditLogEntryType.LIST_USERS);
-
-        cql = "CREATE ROLE "+createTableName()+" WITH PASSWORD = 'test' AND LOGIN = true;";
-        executeAndAssert(cql, AuditLogEntryType.CREATE_ROLE);
-
-        cql = "ALTER ROLE "+currentTable()+" WITH LOGIN = false;";
-        executeAndAssert(cql, AuditLogEntryType.ALTER_ROLE);
-
-        cql = "DROP ROLE "+currentTable();
-        executeAndAssert(cql, AuditLogEntryType.DROP_ROLE);
-    }
-
-    @Ignore
-    @Test
-    public void testCqlLISTPERMISSIONSAuditing() throws Throwable
-    {
-
-        String cql = "LIST ALL";
-        executeAndAssert(cql, AuditLogEntryType.LIST_PERMISSIONS);
-
-    }
-
-    @Ignore
-    @Test
-    public void testCqlREVOKEAuditing() throws Throwable
-    {
-        createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
-
-        String cql = "REVOKE SELECT ON  "+KEYSPACE+"."+createTableName()+"  FROM manager;";
-        executeAndAssert(cql, AuditLogEntryType.REVOKE);
-
-    }
-
-
     /**
      * Helper methods for Audit Log CQL Testing
      */

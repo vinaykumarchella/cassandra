@@ -238,6 +238,26 @@ public class AuditLogManager
     }
 
     /**
+     * Gets the AuditEvent entry as per the params given. Ensure that type is set by the caller.
+     *
+     * @param operation
+     * @param queryState
+     * @return
+     */
+    public AuditLogEntry getEvent(String operation, QueryState queryState, AuditLogEntryType type)
+    {
+
+        AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
+
+        entry.setKeyspace(queryState.getClientState().getRawKeyspace())
+             .setOperation(operation)
+             .setType(type);
+
+        return entry;
+    }
+
+
+    /**
      * Native protocol/ CQL helper methods for Audit Logging
      */
 

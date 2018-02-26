@@ -113,7 +113,8 @@ public enum AuditLogEntryType
     REQUEST_FAILURE,
     LOGIN_ERROR,
     UNAUTHORIZED_ATTEMPT,
-    UNKNOWN;
+    UNKNOWN,
+    LOGIN_SUCCESS;
 
     private static final Map<String, AuditLogEntryType> allStatementsMap = new HashMap<>();
 
