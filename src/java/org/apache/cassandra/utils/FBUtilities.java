@@ -39,6 +39,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.audit.IAuditLogger;
 import org.apache.cassandra.auth.IAuthenticator;
 import org.apache.cassandra.auth.IAuthorizer;
 import org.apache.cassandra.auth.IRoleManager;
@@ -510,6 +511,14 @@ public class FBUtilities
         if (!className.contains("."))
             className = "org.apache.cassandra.auth." + className;
         return FBUtilities.construct(className, "role manager");
+    }
+
+
+    public static IAuditLogger newAuditLogger(String className) throws ConfigurationException
+    {
+        if (!className.contains("."))
+            className = "org.apache.cassandra.audit." + className;
+        return FBUtilities.construct(className, "Audit logger");
     }
 
     /**
