@@ -93,7 +93,6 @@ public class AuditLogFilter
 
         includedCategories.set(includedCategoriesList);
         excludedCategories.set(excludedCategoriesList);
-
     }
 
     private boolean isFiltered(String keyspace)
