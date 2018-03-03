@@ -47,6 +47,7 @@ import org.apache.cassandra.exceptions.AuthenticationException;
 import org.apache.cassandra.exceptions.UnauthorizedException;
 import org.apache.cassandra.schema.SchemaConstants;
 import org.apache.cassandra.service.QueryState;
+import org.apache.cassandra.utils.FBUtilities;
 
 public class AuditLogManager
 {
@@ -76,20 +77,11 @@ public class AuditLogManager
     private IAuditLogger getAuditLogger()
     {
         String loggerClassName = DatabaseDescriptor.getAuditLoggingOptions().logger;
-        if (!loggerClassName.contains("."))
+        if(loggerClassName !=null)
         {
-            loggerClassName = "org.apache.cassandra.audit." + loggerClassName;
+            return FBUtilities.newAuditLogger(loggerClassName);
         }
-        logger.info("Logger instance loaded with class : " + loggerClassName);
-        try
-        {
-            return (IAuditLogger) Class.forName(loggerClassName).newInstance();
-        }
-        catch (ClassNotFoundException | InstantiationException | IllegalAccessException e)
-        {
-            logger.error("Unknown audit logger: " + loggerClassName, e);
-            throw new RuntimeException(e);
-        }
+        return FBUtilities.newAuditLogger(FileAuditLogger.class.getName());
     }
 
     @VisibleForTesting
