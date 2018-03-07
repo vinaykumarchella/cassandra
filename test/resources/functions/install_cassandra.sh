@@ -37,7 +37,6 @@ function install_cassandra() {
   mkdir -p $C_CONF_DIR
   cp $CASSANDRA_HOME/conf/logback*.xml $C_CONF_DIR
   if [[ "0.6" == "$C_MAJOR_VERSION" ]] ; then 
-    cp $CASSANDRA_HOME/conf/storage-conf.xml $C_CONF_DIR
     sed -i -e "s|CASSANDRA_CONF=\$cassandra_home/conf|CASSANDRA_CONF=$C_CONF_DIR|" $CASSANDRA_HOME/bin/cassandra.in.sh
   else
     cp $CASSANDRA_HOME/conf/cassandra.yaml $C_CONF_DIR
