@@ -26,11 +26,16 @@ import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Session;
+import com.datastax.driver.core.exceptions.NoHostAvailableException;
+import com.datastax.driver.core.exceptions.SyntaxError;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.service.StorageService;
 
+import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThat;
 
 
 public class AuditLoggerTest extends CQLTester
@@ -421,6 +426,7 @@ public class AuditLoggerTest extends CQLTester
 
     }
 
+
     @Test
     public void testCqlAGGREGATEAuditing() throws Throwable
     {
@@ -429,6 +435,76 @@ public class AuditLoggerTest extends CQLTester
         String cql = "DROP AGGREGATE IF EXISTS "+KEYSPACE+"."+aggName;
         executeAndAssert(cql, AuditLogEntryType.DROP_AGG);
 
+    }
+
+
+    @Test
+    public void testCqlQuerySyntaxError()
+    {
+        String cql = "INSERT INTO " + KEYSPACE + '.' + currentTable() + "1 (id, v1, v2) VALUES (1, 'insert_audit, 'test')";
+        try
+        {
+            createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
+
+            Session session = sessionNet();
+
+            ResultSet rs = session.execute(cql);
+        }
+        catch (SyntaxError e)
+        {
+        }
+        AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
+        assertLogEntry(logEntry, cql);
+        assertEquals(0,((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
+    }
+    @Test
+    public void testCqlPrepareQueryError()
+    {
+        createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
+        String cql = "INSERT INTO " + KEYSPACE + '.'+currentTable()+ " (id, v1, v2) VALUES (?,?,?)";
+        try
+        {
+
+            Session session = sessionNet();
+
+            PreparedStatement pstmt = session.prepare(cql);
+            AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
+            assertLogEntry(cql, AuditLogEntryType.PREPARE_STATEMENT, logEntry, false);
+
+            dropTable("DROP TABLE %s");
+            ResultSet rs = session.execute(pstmt.bind(1, "insert_audit", "test"));
+
+        }
+        catch (NoHostAvailableException e)
+        {
+        }
+        AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
+        assertLogEntry(logEntry, null);
+        logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
+        assertLogEntry(logEntry, cql);
+        assertEquals(0,((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
+    }
+
+    @Test
+    public void testCqlPrepareQuerySyntaxError()
+    {
+        String cql = "INSERT INTO " + KEYSPACE + '.'+"foo"+ "(id, v1, v2) VALES (?,?,?)";
+        try
+        {
+            createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
+
+            Session session = sessionNet();
+
+            PreparedStatement pstmt = session.prepare(cql);
+            ResultSet rs = session.execute(pstmt.bind(1, "insert_audit", "test"));
+
+        }
+        catch (SyntaxError e)
+        {
+        }
+        AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
+        assertLogEntry(logEntry, cql);
+        assertEquals(0,((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
     }
 
 
@@ -505,5 +581,15 @@ public class AuditLoggerTest extends CQLTester
         assertEquals(type, actual.getType());
         assertEquals(cql,actual.getOperation());
 
+    }
+    private void assertLogEntry(AuditLogEntry logEntry, String cql)
+    {
+        assertNull(logEntry.getKeyspace());
+        assertNull(logEntry.getScope());
+        assertEquals(AuditLogEntryType.REQUEST_FAILURE, logEntry.getType());
+        if(null != cql && !cql.isEmpty())
+        {
+            assertThat(logEntry.getOperation(), containsString(cql));
+        }
     }
 }

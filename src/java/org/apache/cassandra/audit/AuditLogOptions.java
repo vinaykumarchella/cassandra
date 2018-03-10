@@ -27,4 +27,28 @@ public class AuditLogOptions
     public String excluded_categories = "";
     public String included_users = "";
     public String excluded_users= "";
+
+    /**
+     * AuditLogs directory can be configured using `cassandra.logdir.audit` or default is set to `cassandra.logdir` + /audit/
+     */
+    public String audit_logs_dir = System.getProperty("cassandra.logdir.audit",
+                                                      System.getProperty("cassandra.logdir",".")+"/audit/");
+    /**
+     * Blocking Whether the AuditLog should block if the FQL falls behind or should drop audit log records. Default is set to true so that AuditLog records wont be lost
+     */
+    public boolean block = true;
+
+    /**
+     * max_queue_weight: Maximum weight of in memory queue for records waiting to be written to the audit log file before blocking or dropping the log records. For advanced configurations
+     */
+    public int max_queue_weight = 256 * 1024 * 1024;
+    /**
+     * max_log_size: Maximum size of the rolled files to retain on disk before deleting the oldest file. For advanced configurations
+     */
+    public long max_log_size = 16L * 1024L * 1024L * 1024L;
+    /**
+     * roll_cycle: How often to roll Audit log segments so they can potentially be reclaimed. Available options are:
+     * MINUTELY, HOURLY, DAILY, LARGE_DAILY, XLARGE_DAILY, HUGE_DAILY. For more options, refer: net.openhft.chronicle.queue.RollCycles
+     */
+    public String roll_cycle = "HOURLY";
 }

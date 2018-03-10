@@ -18,8 +18,12 @@
 
 package org.apache.cassandra.audit;
 
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
@@ -29,20 +33,8 @@ import org.slf4j.LoggerFactory;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.QueryOptions;
-import org.apache.cassandra.cql3.statements.AlterKeyspaceStatement;
-import org.apache.cassandra.cql3.statements.AlterTypeStatement;
-import org.apache.cassandra.cql3.statements.CFStatement;
-import org.apache.cassandra.cql3.statements.CreateAggregateStatement;
-import org.apache.cassandra.cql3.statements.CreateFunctionStatement;
-import org.apache.cassandra.cql3.statements.CreateKeyspaceStatement;
-import org.apache.cassandra.cql3.statements.CreateTypeStatement;
-import org.apache.cassandra.cql3.statements.DropAggregateStatement;
-import org.apache.cassandra.cql3.statements.DropFunctionStatement;
-import org.apache.cassandra.cql3.statements.DropKeyspaceStatement;
-import org.apache.cassandra.cql3.statements.DropTypeStatement;
-import org.apache.cassandra.cql3.statements.ModificationStatement;
 import org.apache.cassandra.cql3.statements.ParsedStatement;
-import org.apache.cassandra.cql3.statements.SelectStatement;
+import org.apache.cassandra.db.fullquerylog.FullQueryLogger;
 import org.apache.cassandra.exceptions.AuthenticationException;
 import org.apache.cassandra.exceptions.UnauthorizedException;
 import org.apache.cassandra.schema.SchemaConstants;
@@ -94,6 +86,14 @@ public class AuditLogManager
     {
         return DatabaseDescriptor.getAuditLoggingOptions().enabled;
     }
+    public boolean isLoggingEnabled()
+    {
+        return isAuditingEnabled() || FullQueryLogger.instance.enabled();
+    }
+    public boolean isFQLEnabled()
+    {
+        return FullQueryLogger.instance.enabled();
+    }
 
     private boolean isSystemKeyspace(String keyspaceName)
     {
@@ -120,14 +120,6 @@ public class AuditLogManager
         for (AuditLogEntry auditLogEntry : auditLogEntries)
         {
             this.log(auditLogEntry);
-        }
-    }
-
-    public void logError(AuditLogEntry logEntry)
-    {
-        if (isAuditingEnabled() && (null == logEntry.getKeyspace() || !isSystemKeyspace(logEntry.getKeyspace())))
-        {
-            this.auditLogger.error(logEntry);
         }
     }
 
@@ -166,6 +158,46 @@ public class AuditLogManager
         }
     }
 
+
+    public void log(CQLStatement statement, String query, QueryOptions options, QueryState state, long queryStartNanoTime)
+    {
+        if(isAuditingEnabled())
+        {
+            AuditLogEntry auditEntry = this.getLogEntry(statement, query, state, options);
+            this.log(auditEntry);
+        }
+        if(isFQLEnabled())
+        {
+            long fqlTime =  System.currentTimeMillis()-TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-queryStartNanoTime);
+            FullQueryLogger.instance.logQuery(query, options, fqlTime);
+        }
+    }
+
+
+    public void logBatch(String batchTypeName, List<Object> queryOrIdList, List<List<ByteBuffer>> values, List<ParsedStatement.Prepared> prepared, QueryOptions options, QueryState state, long queryStartNanoTime)
+    {
+        if(isAuditingEnabled())
+        {
+            this.log(this.getLogEntriesForBatch(queryOrIdList, prepared, state, options));
+        }
+        if(isFQLEnabled())
+        {
+            List<String> queryStrings = new ArrayList<>(queryOrIdList.size());
+            for (ParsedStatement.Prepared prepStatment : prepared)
+            {
+                queryStrings.add(prepStatment.rawCQLStatement);
+            }
+            FullQueryLogger.instance.logBatch(batchTypeName, queryStrings, values, options, queryStartNanoTime);
+        }
+    }
+
+    public void logError(AuditLogEntry logEntry)
+    {
+        if (isAuditingEnabled() && (null == logEntry.getKeyspace() || !isSystemKeyspace(logEntry.getKeyspace())))
+        {
+            this.auditLogger.error(logEntry);
+        }
+    }
     /**
      * Native protocol/ CQL helper methods for Audit Logging
      */
@@ -292,4 +324,5 @@ public class AuditLogManager
     {
         return stmt.getAuditLogContext().scope;
     }
+
 }

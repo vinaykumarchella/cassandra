@@ -23,12 +23,9 @@ import com.google.common.collect.ImmutableMap;
 
 import io.netty.buffer.ByteBuf;
 import org.apache.cassandra.audit.AuditLogEntry;
-import org.apache.cassandra.audit.AuditLogEntryType;
-import org.apache.cassandra.audit.AuditLogManager;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.statements.ParsedStatement;
-import org.apache.cassandra.db.fullquerylog.FullQueryLogger;
 import org.apache.cassandra.exceptions.RequestExecutionException;
 import org.apache.cassandra.exceptions.RequestValidationException;
 import org.apache.cassandra.service.ClientState;
@@ -91,8 +88,6 @@ public class QueryMessage extends Message.Request
 
     public Message.Response execute(QueryState state, long queryStartNanoTime)
     {
-        AuditLogEntry auditEntry = null;
-
         try
         {
             if (options.getPageSize() == 0)
@@ -121,27 +116,12 @@ public class QueryMessage extends Message.Request
                 Tracing.instance.begin("Execute CQL3 query", state.getClientAddress(), builder.build());
             }
 
-            boolean fqlEnabled = FullQueryLogger.instance.enabled();
-            long fqlTime = 0;
-            if (fqlEnabled)
-            {
-                fqlTime = System.currentTimeMillis();
-            }
-            if(auditLogEnabled)
-            {
-                auditEntry = auditLogManager.getLogEntry(query, state, options);
-            }
             Message.Response response = ClientState.getCQLQueryHandler().process(query, state, options, getCustomPayload(), queryStartNanoTime);
-            if (fqlEnabled)
-            {
-                FullQueryLogger.instance.logQuery(query, options, fqlTime);
-            }
-            if(auditLogEnabled)
-            {
 
+            if(isLoggingEnabled)
+            {
                 ParsedStatement.Prepared parsedStmt = QueryProcessor.parseStatement(query, state.getClientState());
-                auditEntry = auditLogManager.getLogEntry(parsedStmt.statement,query, state, options);
-                auditLogManager.log(auditEntry);
+                auditLogManager.log(parsedStmt.statement, query, options, state, queryStartNanoTime);
             }
 
             if (options.skipMetadata() && response instanceof ResultMessage.Rows)
@@ -154,7 +134,11 @@ public class QueryMessage extends Message.Request
         }
         catch (Exception e)
         {
-            auditLogManager.log(auditEntry, e);
+            if(auditLogEnabled)
+            {
+                AuditLogEntry auditEntry = auditLogManager.getLogEntry(query, state, options);
+                auditLogManager.log(auditEntry, e);
+            }
             JVMStabilityInspector.inspectThrowable(e);
             if (!((e instanceof RequestValidationException) || (e instanceof RequestExecutionException)))
                 logger.error("Unexpected error during query", e);

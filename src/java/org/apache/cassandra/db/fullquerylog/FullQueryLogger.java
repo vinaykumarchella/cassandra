@@ -74,19 +74,19 @@ public class FullQueryLogger
         EMPTY_BYTEBUF_SIZE = tempSize;
     }
 
-    private static final Logger logger = LoggerFactory.getLogger(FullQueryLogger.class);
-    private static final NoSpamLogger noSpamLogger = NoSpamLogger.getLogger(logger, 1, TimeUnit.MINUTES);
-    private static final NoSpamLogger.NoSpamLogStatement droppedSamplesStatement = noSpamLogger.getStatement("Dropped {} binary log samples", 1, TimeUnit.MINUTES);
+    protected static final Logger logger = LoggerFactory.getLogger(FullQueryLogger.class);
+    protected static final NoSpamLogger noSpamLogger = NoSpamLogger.getLogger(logger, 1, TimeUnit.MINUTES);
+    protected static final NoSpamLogger.NoSpamLogStatement droppedSamplesStatement = noSpamLogger.getStatement("Dropped {} binary log samples", 1, TimeUnit.MINUTES);
 
     public static final FullQueryLogger instance = new FullQueryLogger();
 
-    volatile BinLog binLog;
-    private volatile boolean blocking;
-    private Path path;
+    protected volatile BinLog binLog;
+    protected volatile boolean blocking;
+    protected Path path;
 
-    private final AtomicLong droppedSamplesSinceLastLog = new AtomicLong();
+    protected final AtomicLong droppedSamplesSinceLastLog = new AtomicLong();
 
-    private FullQueryLogger()
+    protected FullQueryLogger()
     {
     }
 
@@ -230,7 +230,7 @@ public class FullQueryLogger
      * This is potentially lossy, but it's not super critical as we will always generally know
      * when this is happening and roughly how bad it is.
      */
-    private void logDroppedSample()
+    protected void logDroppedSample()
     {
         droppedSamplesSinceLastLog.incrementAndGet();
         if (droppedSamplesStatement.warn(new Object[] {droppedSamplesSinceLastLog.get()}))
@@ -266,7 +266,7 @@ public class FullQueryLogger
         logRecord(wrappedBatch, binLog);
     }
 
-    void logRecord(AbstractWeighableMarshallable record, BinLog binLog)
+    protected void logRecord(BinLog.ReleaseableWriteMarshallable record, BinLog binLog)
     {
 
         boolean putInQueue = false;
