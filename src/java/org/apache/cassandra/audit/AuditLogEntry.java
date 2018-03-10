@@ -25,7 +25,6 @@ import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 
 import org.apache.cassandra.auth.AuthenticatedUser;
-import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.utils.FBUtilities;
 
@@ -78,7 +77,8 @@ public class AuditLogEntry
     public String toString()
     {
         StringBuilder builder = new StringBuilder();
-        builder.append("host:").append(this.host)
+        builder.append("user:").append(this.user)
+               .append("|host:").append(this.host)
                .append("|source:").append(this.source);
         if (srcPort > 0)
         {
@@ -111,6 +111,11 @@ public class AuditLogEntry
     {
         this.user = user;
         return this;
+    }
+
+    public String getUser()
+    {
+        return this.user;
     }
 
     public AuditLogEntry setSource(String source)
