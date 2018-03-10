@@ -17,19 +17,9 @@
  */
 package org.apache.cassandra.audit;
 
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Modifier;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.LinkedList;
-import java.util.List;
-
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import com.datastax.driver.core.BatchStatement;
@@ -37,7 +27,6 @@ import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Session;
 import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.service.StorageService;
 
@@ -73,28 +62,6 @@ public class AuditLoggerTest extends CQLTester
     @AfterClass
     public static void tearDown()
     {
-    }
-
-    @Test
-    public void testNoMissingCQLStatements() throws Throwable
-    {
-        List<Class<?>> res = findClassesImpmenenting(CQLStatement.class, CQLStatement.class.getPackage());
-        List<Class<?>> missingClasses = new LinkedList<>();
-        StringBuilder missingClassNames = new StringBuilder();
-        for (Class<?> cl : res)
-        {
-            if( (! Modifier.isAbstract(cl.getModifiers())) && (! AuditLogEntryType.getAllStatementsMap().containsKey(cl.getCanonicalName())))
-            {
-                if(! AuditLogEntryType.getAllStatementsMap().containsKey(AuditLogEntryType.getParentClassName(cl.getTypeName())))
-                {
-                    missingClasses.add(cl);
-                    missingClassNames.append(cl.getTypeName()).append(", ");
-                }
-            }
-
-        }
-
-        assertEquals("Following CQLStatements are missing in AuditLogEntryType enum. Please add these missing classes to AuditLogEntryType.allStatementsMap to fix this failing test. Missing classes : " + missingClassNames, 0, missingClasses.size());
     }
 
 
@@ -412,10 +379,11 @@ public class AuditLoggerTest extends CQLTester
     @Test
     public void testCqlINDEXAuditing() throws Throwable
     {
-        String indexName = createTableName();
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
 
         String tblName = currentTable();
+
+        String indexName = createTableName();
 
         String cql = "CREATE INDEX "+indexName+" ON "+KEYSPACE+"."+tblName+" (v1)";
         executeAndAssert(cql, AuditLogEntryType.CREATE_INDEX);
@@ -442,11 +410,13 @@ public class AuditLoggerTest extends CQLTester
     @Test
     public void testCqlTRIGGERAuditing() throws Throwable
     {
-        String triggerName = createTableName();
 
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
 
-        String cql = "DROP TRIGGER IF EXISTS "+triggerName+ " ON "+KEYSPACE+"."+currentTable();
+        String tblName = currentTable();
+        String triggerName = createTableName();
+
+        String cql = "DROP TRIGGER IF EXISTS "+triggerName+ " ON "+KEYSPACE+"."+tblName;
         executeAndAssert(cql, AuditLogEntryType.DROP_TRIGGER);
 
     }
@@ -535,100 +505,5 @@ public class AuditLoggerTest extends CQLTester
         assertEquals(type, actual.getType());
         assertEquals(cql,actual.getOperation());
 
-    }
-
-    /**
-     * Find All classes implementing an interface in a given package
-     * @param interfaceClass
-     * @param fromPackage
-     * @return
-     */
-    public static List<Class<?>> findClassesImpmenenting(final Class<?> interfaceClass, final Package fromPackage)
-    {
-
-        final List<Class<?>> rVal = new ArrayList<Class<?>>();
-        try
-        {
-            final Class<?>[] targets = getAllClassesFromPackage(fromPackage.getName());
-            if (targets != null)
-            {
-                for (Class<?> aTarget : targets)
-                {
-                    if (aTarget == null)
-                    {
-                        continue;
-                    }
-                    else if (aTarget.equals(interfaceClass))
-                    {
-                        continue;
-                    }
-                    else if (!interfaceClass.isAssignableFrom(aTarget))
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        rVal.add(aTarget);
-                    }
-                }
-            }
-        }
-        catch (ClassNotFoundException | IOException e)
-        {
-
-        }
-
-        return rVal;
-    }
-
-    /**
-     * Load all classes from a package.
-     *
-     * @param packageName
-     * @return
-     * @throws ClassNotFoundException
-     * @throws IOException
-     */
-    public static Class[] getAllClassesFromPackage(final String packageName) throws ClassNotFoundException, IOException {
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        assert classLoader != null;
-        String path = packageName.replace('.', '/');
-        Enumeration<URL> resources = classLoader.getResources(path);
-        List<File> dirs = new ArrayList<File>();
-        while (resources.hasMoreElements()) {
-            URL resource = resources.nextElement();
-            dirs.add(new File(resource.getFile()));
-        }
-        ArrayList<Class> classes = new ArrayList<Class>();
-        for (File directory : dirs) {
-            classes.addAll(findClasses(directory, packageName));
-        }
-        return classes.toArray(new Class[classes.size()]);
-    }
-
-    /**
-     * Find file in package.
-     *
-     * @param directory
-     * @param packageName
-     * @return
-     * @throws ClassNotFoundException
-     */
-    public static List<Class<?>> findClasses(File directory, String packageName) throws ClassNotFoundException {
-        List<Class<?>> classes = new ArrayList<Class<?>>();
-        if (!directory.exists()) {
-            return classes;
-        }
-        File[] files = directory.listFiles();
-        for (File file : files) {
-            if (file.isDirectory()) {
-                assert !file.getName().contains(".");
-                classes.addAll(findClasses(file, packageName + "." + file.getName()));
-            }
-            else if (file.getName().endsWith(".class")) {
-                classes.add(Class.forName(packageName + '.' + file.getName().substring(0, file.getName().length() - 6)));
-            }
-        }
-        return classes;
     }
 }

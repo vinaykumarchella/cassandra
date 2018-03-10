@@ -116,93 +116,16 @@ public enum AuditLogEntryType
     UNKNOWN("Other"),
     LOGIN_SUCCESS("AUTH");
 
-    private static final Map<String, AuditLogEntryType> allStatementsMap = new HashMap<>();
+
     final String category;
 
     AuditLogEntryType(String category) {
         this.category = category;
     }
 
-    @VisibleForTesting
-    public static Map<String, AuditLogEntryType> getAllStatementsMap()
-    {
-        return allStatementsMap;
-    }
-
-    public static AuditLogEntryType getType(CQLStatement statement)
-    {
-        AuditLogEntryType returnType = allStatementsMap.getOrDefault(statement.getClass().getCanonicalName(), AuditLogEntryType.UNKNOWN);
-
-        if (returnType == AuditLogEntryType.UNKNOWN)
-        {
-            returnType = allStatementsMap.getOrDefault(getParentClassName(statement.getClass().getTypeName()), AuditLogEntryType.UNKNOWN);
-        }
-
-        return returnType;
-    }
-
-    @VisibleForTesting
-    public static String getParentClassName(String typeName)
-    {
-        // Check if the class is of any of following types, if so get the parent class name
-        // Static inner class, Private Static inner class, Inner class,
-        // Anonymous class, Lambda runnable class, Method reference class
-        if(typeName.contains("$"))
-        {
-            String[] classNameSplit = typeName.split("\\$");
-            if(classNameSplit.length>0)
-            {
-                return classNameSplit[0];
-            }
-        }
-        return null;
-    }
-
     public String getCategory()
     {
         return this.category;
-    }
-
-    static
-    {
-        allStatementsMap.put(SelectStatement.class.getCanonicalName(), AuditLogEntryType.SELECT);
-        allStatementsMap.put(DropTriggerStatement.class.getCanonicalName(), AuditLogEntryType.DROP_TRIGGER);
-        allStatementsMap.put(GrantPermissionsStatement.class.getCanonicalName(), AuditLogEntryType.GRANT);
-        allStatementsMap.put(CreateTypeStatement.class.getCanonicalName(), AuditLogEntryType.CREATE_TYPE);
-        allStatementsMap.put(DropKeyspaceStatement.class.getCanonicalName(), AuditLogEntryType.DROP_KS);
-        allStatementsMap.put(DeleteStatement.class.getCanonicalName(), AuditLogEntryType.DELETE);
-        allStatementsMap.put(DropAggregateStatement.class.getCanonicalName(), AuditLogEntryType.DROP_AGG);
-        allStatementsMap.put(UpdateStatement.class.getCanonicalName(), AuditLogEntryType.UPDATE);
-        allStatementsMap.put(AlterViewStatement.class.getCanonicalName(), AuditLogEntryType.ALTER_VIEW);
-        allStatementsMap.put(CreateViewStatement.class.getCanonicalName(), AuditLogEntryType.CREATE_VIEW);
-        allStatementsMap.put(DropRoleStatement.class.getCanonicalName(), AuditLogEntryType.DROP_ROLE);
-        allStatementsMap.put(UseStatement.class.getCanonicalName(), AuditLogEntryType.USE_KS);
-        allStatementsMap.put(RevokeRoleStatement.class.getCanonicalName(), AuditLogEntryType.REVOKE);
-        allStatementsMap.put(CreateFunctionStatement.class.getCanonicalName(), AuditLogEntryType.CREATE_FUNC);
-        allStatementsMap.put(AlterTableStatement.class.getCanonicalName(), AuditLogEntryType.ALTER_TABLE);
-        allStatementsMap.put(BatchStatement.class.getCanonicalName(), AuditLogEntryType.BATCH);
-        allStatementsMap.put(CreateAggregateStatement.class.getCanonicalName(), AuditLogEntryType.CREATE_AGG);
-        allStatementsMap.put(CreateIndexStatement.class.getCanonicalName(), AuditLogEntryType.CREATE_INDEX);
-        allStatementsMap.put(AuthenticationStatement.class.getCanonicalName(), AuditLogEntryType.AUTH);
-        allStatementsMap.put(DropIndexStatement.class.getCanonicalName(), AuditLogEntryType.DROP_INDEX);
-        allStatementsMap.put(CreateKeyspaceStatement.class.getCanonicalName(), AuditLogEntryType.CREATE_KS);
-        allStatementsMap.put(ListUsersStatement.class.getCanonicalName(), AuditLogEntryType.LIST_USERS);
-        allStatementsMap.put(AlterKeyspaceStatement.class.getCanonicalName(), AuditLogEntryType.ALTER_KS);
-        allStatementsMap.put(DropViewStatement.class.getCanonicalName(), AuditLogEntryType.DROP_VIEW);
-        allStatementsMap.put(DropTypeStatement.class.getCanonicalName(), AuditLogEntryType.DROP_TYPE);
-        allStatementsMap.put(GrantRoleStatement.class.getCanonicalName(), AuditLogEntryType.GRANT);
-        allStatementsMap.put(DropFunctionStatement.class.getCanonicalName(), AuditLogEntryType.DROP_FUNC);
-        allStatementsMap.put(AlterRoleStatement.class.getCanonicalName(), AuditLogEntryType.ALTER_ROLE);
-        allStatementsMap.put(SelectStatement.class.getCanonicalName(), AuditLogEntryType.SELECT);
-        allStatementsMap.put(TruncateStatement.class.getCanonicalName(), AuditLogEntryType.TRUNCATE);
-        allStatementsMap.put(CreateTriggerStatement.class.getCanonicalName(), AuditLogEntryType.CREATE_TRIGGER);
-        allStatementsMap.put(DropTableStatement.class.getCanonicalName(), AuditLogEntryType.DROP_TABLE);
-        allStatementsMap.put(RevokePermissionsStatement.class.getCanonicalName(), AuditLogEntryType.REVOKE);
-        allStatementsMap.put(ListRolesStatement.class.getCanonicalName(), AuditLogEntryType.LIST_ROLES);
-        allStatementsMap.put(ListPermissionsStatement.class.getCanonicalName(), AuditLogEntryType.LIST_PERMISSIONS);
-        allStatementsMap.put(AlterTypeStatement.class.getCanonicalName(), AuditLogEntryType.ALTER_TYPE);
-        allStatementsMap.put(CreateRoleStatement.class.getCanonicalName(), AuditLogEntryType.CREATE_ROLE);
-        allStatementsMap.put(CreateTableStatement.class.getCanonicalName(), AuditLogEntryType.CREATE_TABLE);
     }
 
 }
