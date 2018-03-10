@@ -19,6 +19,7 @@ package org.apache.cassandra.cql3.statements;
 
 import java.util.concurrent.TimeoutException;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.db.ColumnFamilyStore;
@@ -87,5 +88,11 @@ public class TruncateStatement extends CFStatement implements CQLStatement
             throw new TruncateException(e);
         }
         return null;
+    }
+
+    @Override
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.TRUNCATE, keyspace(), cfName.getColumnFamily());
     }
 }

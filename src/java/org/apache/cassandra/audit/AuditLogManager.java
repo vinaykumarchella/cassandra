@@ -208,13 +208,13 @@ public class AuditLogManager
 
     public AuditLogEntry getLogEntry(CQLStatement statement, String queryString, QueryState queryState)
     {
-        return this.getLogEntry(statement, queryString, queryState, AuditLogEntryType.getType(statement));
+        return this.getLogEntry(statement, queryString, queryState, statement.getAuditLogContext().auditLogEntryType);
     }
 
     public AuditLogEntry getLogEntry(CQLStatement statement, String queryString, QueryState queryState, QueryOptions queryOptions)
     {
 
-        return this.getLogEntry(statement, queryString, queryState).setConsistencyLevel(queryOptions.getConsistency());
+        return this.getLogEntry(statement, queryString, queryState);
     }
 
     /**
@@ -231,8 +231,7 @@ public class AuditLogManager
         AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
 
         entry.setKeyspace(queryState.getClientState().getRawKeyspace())
-             .setOperation(queryString)
-             .setConsistencyLevel(queryOptions.getConsistency());
+             .setOperation(queryString);
 
         return entry;
     }
@@ -252,8 +251,8 @@ public class AuditLogManager
 
         entry.setKeyspace(queryState.getClientState().getRawKeyspace())
              .setBatch(batchId)
-             .setOperation(queryString)
-             .setConsistencyLevel(queryOptions.getConsistency());
+             .setType(AuditLogEntryType.BATCH)
+             .setOperation(queryString);
         return entry;
     }
 
@@ -270,7 +269,7 @@ public class AuditLogManager
 
         String queryString = String.format("BatchId:[%s] - BATCH of [%d] statements", batchId, queryOrIdList.size());
 
-        auditLogEntries.add(this.getLogEntry(queryString, state, options, batchId).setType(AuditLogEntryType.BATCH));
+        auditLogEntries.add(this.getLogEntry(queryString, state, options, batchId));
 
         for (int i = 0; i < queryOrIdList.size(); i++)
         {
@@ -286,86 +285,11 @@ public class AuditLogManager
 
     private String getKeyspace(CQLStatement stmt, QueryState queryState)
     {
-        //TODO: Cleaner way to do this - Create IAuditLogStatement interface and let all CQLStatements implement it to get the Keyspace, scope and any other Audit log context
-        if ((stmt instanceof CreateFunctionStatement))
-        {
-            return ((CreateFunctionStatement)stmt).getFunctionName().keyspace;
-        }
-        if ((stmt instanceof DropFunctionStatement))
-        {
-            return ((DropFunctionStatement)stmt).getFunctionName().keyspace;
-        }
-        if ((stmt instanceof CreateAggregateStatement) )
-        {
-            return ((CreateAggregateStatement) stmt).getFunctionName().keyspace;
-        }
-        if ((stmt instanceof DropAggregateStatement) )
-        {
-            return ((DropAggregateStatement) stmt).getFunctionName().keyspace;
-        }
-        if ((stmt instanceof CFStatement))
-        {
-            return ((CFStatement) stmt).keyspace();
-        }
-        if ((stmt instanceof ModificationStatement))
-        {
-            return ((ModificationStatement) stmt).keyspace();
-        }
-        if ((stmt instanceof SelectStatement))
-        {
-            return ((SelectStatement) stmt).keyspace();
-        }
-
-        return queryState.getClientState().getRawKeyspace();
+        return stmt.getAuditLogContext().keyspace!=null ? stmt.getAuditLogContext().keyspace : queryState.getClientState().getRawKeyspace();
     }
 
     public static String getColumnFamily(CQLStatement stmt)
     {
-        //TODO: Cleaner way to do this - Create IAuditLogStatement interface and let all CQLStatements implement it to get the Keyspace, scope and any other Audit log context
-        if (((stmt instanceof DropKeyspaceStatement)) || ((stmt instanceof CreateKeyspaceStatement)) || ((stmt instanceof AlterKeyspaceStatement)))
-        {
-            return null;
-        }
-        if ((stmt instanceof CreateFunctionStatement) )
-        {
-            return ((CreateFunctionStatement) stmt).getFunctionName().name;
-        }
-        if ((stmt instanceof DropFunctionStatement) )
-        {
-            return ((DropFunctionStatement) stmt).getFunctionName().name;
-        }
-        if ((stmt instanceof CreateAggregateStatement) )
-        {
-            return ((CreateAggregateStatement) stmt).getFunctionName().name;
-        }
-        if ((stmt instanceof DropAggregateStatement) )
-        {
-            return ((DropAggregateStatement) stmt).getFunctionName().name;
-        }
-        if ((stmt instanceof CreateTypeStatement) )
-        {
-            return ((CreateTypeStatement) stmt).getStringTypeName();
-        }
-        if ((stmt instanceof AlterTypeStatement) )
-        {
-            return ((AlterTypeStatement) stmt).getStringTypeName();
-        }
-        if ( (stmt instanceof DropTypeStatement))
-        {
-            return ((DropTypeStatement) stmt).getStringTypeName();
-        }
-        if ((stmt instanceof CFStatement))
-        {
-            return ((CFStatement) stmt).columnFamily();
-        }
-        if ((stmt instanceof ModificationStatement))
-        {
-            return ((ModificationStatement) stmt).columnFamily();
-        }
-        if ((stmt instanceof SelectStatement))
-        {
-            return ((SelectStatement) stmt).table.name;
-        }
-        return null;
+        return stmt.getAuditLogContext().scope;
     }
 }
