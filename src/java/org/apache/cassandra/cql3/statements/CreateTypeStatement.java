@@ -20,6 +20,7 @@ package org.apache.cassandra.cql3.statements;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.db.marshal.AbstractType;
@@ -136,5 +137,11 @@ public class CreateTypeStatement extends SchemaAlteringStatement
     public String getStringTypeName()
     {
         return name.getStringTypeName();
+    }
+
+    @Override
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.CREATE_TYPE, keyspace(), getStringTypeName());
     }
 }

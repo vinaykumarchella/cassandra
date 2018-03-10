@@ -23,6 +23,8 @@ import com.google.common.collect.ImmutableMap;
 
 import io.netty.buffer.ByteBuf;
 import org.apache.cassandra.audit.AuditLogEntry;
+import org.apache.cassandra.audit.AuditLogEntryType;
+import org.apache.cassandra.audit.AuditLogManager;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.statements.ParsedStatement;
@@ -127,8 +129,7 @@ public class QueryMessage extends Message.Request
             }
             if(auditLogEnabled)
             {
-                ParsedStatement.Prepared parsedStmt = QueryProcessor.parseStatement(query, state.getClientState());
-                auditEntry = auditLogManager.getLogEntry(parsedStmt.statement, query, state, options);
+                auditEntry = auditLogManager.getLogEntry(query, state, options);
             }
             Message.Response response = ClientState.getCQLQueryHandler().process(query, state, options, getCustomPayload(), queryStartNanoTime);
             if (fqlEnabled)
@@ -137,6 +138,9 @@ public class QueryMessage extends Message.Request
             }
             if(auditLogEnabled)
             {
+
+                ParsedStatement.Prepared parsedStmt = QueryProcessor.parseStatement(query, state.getClientState());
+                auditEntry = auditLogManager.getLogEntry(parsedStmt.statement,query, state, options);
                 auditLogManager.log(auditEntry);
             }
 

@@ -20,6 +20,7 @@ package org.apache.cassandra.cql3.statements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.cql3.CFName;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.exceptions.InvalidRequestException;
@@ -95,4 +96,11 @@ public class CreateTriggerStatement extends SchemaAlteringStatement
         MigrationManager.announceTableUpdate(updated, isLocalOnly);
         return new Event.SchemaChange(Event.SchemaChange.Change.UPDATED, Event.SchemaChange.Target.TABLE, keyspace(), columnFamily());
     }
+
+    @Override
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.CREATE_TRIGGER, keyspace(), triggerName);
+    }
+
 }

@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.cql3.CQL3Type;
 import org.apache.cassandra.cql3.functions.*;
@@ -153,5 +154,11 @@ public final class DropAggregateStatement extends SchemaAlteringStatement
     public FunctionName getFunctionName()
     {
         return functionName;
+    }
+
+    @Override
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.DROP_AGG, getFunctionName().keyspace, getFunctionName().name);
     }
 }

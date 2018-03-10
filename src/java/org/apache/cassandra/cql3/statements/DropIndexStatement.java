@@ -17,6 +17,7 @@
  */
 package org.apache.cassandra.cql3.statements;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.schema.Schema;
@@ -112,5 +113,11 @@ public class DropIndexStatement extends SchemaAlteringStatement
                                                                           "of the tables of keyspace '%s'",
                                                                           indexName, keyspace()));
                   });
+    }
+
+    @Override
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.DROP_INDEX, keyspace(), indexName);
     }
 }

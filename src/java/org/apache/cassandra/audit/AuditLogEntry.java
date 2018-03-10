@@ -39,7 +39,6 @@ public class AuditLogEntry
     private AuditLogEntryType type;
     private UUID batch;
     private String keyspace, scope, operation="";
-    private ConsistencyLevel consistencyLevel;
 
     public AuditLogEntry(String source, int srcPort, String user)
     {
@@ -63,7 +62,6 @@ public class AuditLogEntry
         this.scope = auditLogEntry.scope;
         this.batch = auditLogEntry.batch;
         this.operation = auditLogEntry.operation;
-        this.consistencyLevel = auditLogEntry.consistencyLevel;
     }
 
     public static AuditLogEntry getAuditEntry(ClientState clientState)
@@ -106,10 +104,6 @@ public class AuditLogEntry
         {
             builder.append("|operation:").append(this.operation);
         }
-        if (this.consistencyLevel != null)
-        {
-            builder.append("|consistency level:").append(this.consistencyLevel);
-        }
         return builder.toString();
     }
 
@@ -140,12 +134,6 @@ public class AuditLogEntry
     public AuditLogEntry setBatch(UUID batch)
     {
         this.batch = batch;
-        return this;
-    }
-
-    public AuditLogEntry setConsistencyLevel(ConsistencyLevel consistencyLevel)
-    {
-        this.consistencyLevel = consistencyLevel;
         return this;
     }
 

@@ -27,6 +27,7 @@ import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.cql3.*;
@@ -370,5 +371,11 @@ public class CreateViewStatement extends SchemaAlteringStatement
 
         columns.add(def.name);
         return !isPk;
+    }
+
+    @Override
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.CREATE_VIEW, keyspace(), cfName.getColumnFamily());
     }
 }
