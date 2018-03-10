@@ -17,9 +17,7 @@
  */
 package org.apache.cassandra.audit;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -37,6 +35,9 @@ public class AuditLogFilter
 
     private final AtomicReference<Set<String>> excludedCategories = new AtomicReference<>();
     private final AtomicReference<Set<String>> includedCategories = new AtomicReference<>();
+
+    private final AtomicReference<Set<String>> includedUsers = new AtomicReference<>();
+    private final AtomicReference<Set<String>> excludedUsers= new AtomicReference<>();
 
 
     private static final AuditLogFilter instance = new AuditLogFilter();
@@ -60,14 +61,18 @@ public class AuditLogFilter
         Set<String> excludedCategoriesSet = new HashSet<>();
         Set<String> includedCategoriesSet = new HashSet<>();
 
-        for (String keyspace : DatabaseDescriptor.getAuditLoggingOptions().includedKeyspaces.split(","))
+
+        Set<String> excludedUsersSet = new HashSet<>();
+        Set<String> includedUsersSet = new HashSet<>();
+
+        for (String keyspace : DatabaseDescriptor.getAuditLoggingOptions().included_keyspaces.split(","))
         {
             if(!keyspace.isEmpty())
             {
                 includedKeyspacesSet.add(keyspace);
             }
         }
-        for (String keyspace : DatabaseDescriptor.getAuditLoggingOptions().excludedKeyspaces.split(","))
+        for (String keyspace : DatabaseDescriptor.getAuditLoggingOptions().excluded_keyspaces.split(","))
         {
             if(!keyspace.isEmpty())
             {
@@ -75,18 +80,33 @@ public class AuditLogFilter
             }
         }
 
-        for (String keyspace : DatabaseDescriptor.getAuditLoggingOptions().includedCategories.split(","))
+        for (String keyspace : DatabaseDescriptor.getAuditLoggingOptions().included_categories.split(","))
         {
             if(!keyspace.isEmpty())
             {
                 includedCategoriesSet.add(keyspace);
             }
         }
-        for (String keyspace : DatabaseDescriptor.getAuditLoggingOptions().excludedCategories.split(","))
+        for (String keyspace : DatabaseDescriptor.getAuditLoggingOptions().excluded_categories.split(","))
         {
             if(!keyspace.isEmpty())
             {
                 excludedCategoriesSet.add(keyspace);
+            }
+        }
+
+        for (String user : DatabaseDescriptor.getAuditLoggingOptions().included_users.split(","))
+        {
+            if(!user.isEmpty())
+            {
+                includedUsersSet.add(user);
+            }
+        }
+        for (String user : DatabaseDescriptor.getAuditLoggingOptions().excluded_users.split(","))
+        {
+            if(!user.isEmpty())
+            {
+                excludedUsersSet.add(user);
             }
         }
 
@@ -95,54 +115,37 @@ public class AuditLogFilter
 
         includedCategories.set(includedCategoriesSet);
         excludedCategories.set(excludedCategoriesSet);
-    }
 
-    private boolean isFiltered(String keyspace)
-    {
-        if(keyspace != null && !keyspace.isEmpty())
-        {
-            boolean isExcluded = false;
-            if(excludedKeyspaces.get() != null && excludedKeyspaces.get().size()>0)
-            {
-                isExcluded = excludedKeyspaces.get().contains(keyspace);
-            }
-
-            boolean isIncluded = true;
-            if(includedKeyspaces.get() != null && includedKeyspaces.get().size()>0)
-            {
-                isIncluded = includedKeyspaces.get().contains(keyspace);
-            }
-
-            return isExcluded || (!isIncluded);
-        }
-        return false;
+        includedUsers.set(includedUsersSet);
+        excludedUsers.set(excludedUsersSet);
     }
 
     public boolean isFiltered(AuditLogEntry auditLogEntry)
     {
-        return isFiltered(auditLogEntry.getKeyspace()) || isFiltered(auditLogEntry.getType());
+        return isFiltered(auditLogEntry.getKeyspace(),includedKeyspaces,excludedKeyspaces)
+               || isFiltered(auditLogEntry.getType().getCategory(),includedCategories,excludedCategories)
+               || isFiltered(auditLogEntry.getUser(),includedUsers,excludedUsers);
     }
 
-    private boolean isFiltered(AuditLogEntryType auditLogEntryType)
+    private boolean isFiltered(String input, AtomicReference<Set<String>> includeSet, AtomicReference<Set<String>> excludeSet)
     {
-        if(auditLogEntryType.getCategory() != null && !auditLogEntryType.getCategory().isEmpty())
+        if(input != null && !input.isEmpty())
         {
             boolean isExcluded = false;
-            if(excludedCategories.get() != null && excludedCategories.get().size()>0)
+            if(excludeSet.get() != null && excludeSet.get().size()>0)
             {
-                isExcluded = excludedCategories.get().contains(auditLogEntryType.getCategory());
+                isExcluded = excludeSet.get().contains(input);
             }
 
             boolean isIncluded = true;
-            if(includedCategories.get() != null && includedCategories.get().size()>0)
+            if(includeSet.get() != null && includeSet.get().size()>0)
             {
-                isIncluded = includedCategories.get().contains(auditLogEntryType.getCategory());
+                isIncluded = includeSet.get().contains(input);
             }
 
             return isExcluded || (!isIncluded);
         }
         return false;
     }
-
 
 }

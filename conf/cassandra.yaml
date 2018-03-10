@@ -1176,10 +1176,12 @@ back_pressure_strategy:
 # system keyspaces are excluded from audit log.
 # enabled: This option enables/ disables audit log
 # logger: Class name of the logger/ custom logger
-# includedKeyspaces: comma separated list of keyspaces to be included for audit log, default - includes all keysapces
-# excludedKeyspaces: comma separated list of keyspaces to be excluded for audit log, default - excludes no keysapce
-# includedCategories: comma separated list of Audit Log Categories to be included for audit log, default - includes all categories
-# excludedCategories: comma separated list of Audit Log Categories to be excluded for audit log, default - excludes no category
+# included_keyspaces: comma separated list of keyspaces to be included for audit log, default - includes all keysapces
+# excluded_keyspaces: comma separated list of keyspaces to be excluded for audit log, default - excludes no keysapce
+# included_categories: comma separated list of Audit Log Categories to be included for audit log, default - includes all categories
+# excluded_categories: comma separated list of Audit Log Categories to be excluded for audit log, default - excludes no category
+# included_users: comma separated list of users to be included for audit log, default - includes all users
+# excluded_users: comma separated list of users to be excluded for audit log, default - excludes no user
 # List of available categories are found in org.apache.cassandra.audit.AuditLogEntryType.java file
 audit_logging_options:
     enabled: false

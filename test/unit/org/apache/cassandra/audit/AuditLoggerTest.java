@@ -75,7 +75,7 @@ public class AuditLoggerTest extends CQLTester
         AuditLogOptions options = new AuditLogOptions();
         options.enabled = true;
         options.logger = "InMemoryAuditLogger";
-        options.excludedKeyspaces = KEYSPACE;
+        options.excluded_keyspaces = KEYSPACE;
         DatabaseDescriptor.setAuditLoggingOptions(options);
         StorageService.instance.reloadAuditLogFilters();
 
@@ -86,7 +86,7 @@ public class AuditLoggerTest extends CQLTester
         options = new AuditLogOptions();
         options.enabled = true;
         options.logger = "InMemoryAuditLogger";
-        options.includedKeyspaces = KEYSPACE;
+        options.included_keyspaces = KEYSPACE;
         DatabaseDescriptor.setAuditLoggingOptions(options);
         StorageService.instance.reloadAuditLogFilters();
 
@@ -97,8 +97,8 @@ public class AuditLoggerTest extends CQLTester
         options = new AuditLogOptions();
         options.enabled = true;
         options.logger = "InMemoryAuditLogger";
-        options.includedKeyspaces = KEYSPACE;
-        options.excludedKeyspaces = KEYSPACE;
+        options.included_keyspaces = KEYSPACE;
+        options.excluded_keyspaces = KEYSPACE;
         DatabaseDescriptor.setAuditLoggingOptions(options);
         StorageService.instance.reloadAuditLogFilters();
 
