@@ -129,21 +129,26 @@ public class AuditLogFilter
 
     private boolean isFiltered(String input, AtomicReference<Set<String>> includeSet, AtomicReference<Set<String>> excludeSet)
     {
-        if(input != null && !input.isEmpty())
+        if (input != null && !input.isEmpty())
         {
             boolean isExcluded = false;
-            if(excludeSet.get() != null && excludeSet.get().size()>0)
+            if (excludeSet.get() != null && excludeSet.get().size() > 0)
             {
                 isExcluded = excludeSet.get().contains(input);
             }
-
-            boolean isIncluded = true;
-            if(includeSet.get() != null && includeSet.get().size()>0)
+            if (isExcluded)
             {
-                isIncluded = includeSet.get().contains(input);
+                return true;
             }
-
-            return isExcluded || (!isIncluded);
+            else
+            {
+                boolean isIncluded = true;
+                if (includeSet.get() != null && includeSet.get().size() > 0)
+                {
+                    isIncluded = includeSet.get().contains(input);
+                }
+                return !isIncluded;
+            }
         }
         return false;
     }
