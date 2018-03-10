@@ -20,8 +20,8 @@ package org.apache.cassandra.transport.messages;
 import java.util.UUID;
 
 import com.google.common.collect.ImmutableMap;
-import io.netty.buffer.ByteBuf;
 
+import io.netty.buffer.ByteBuf;
 import org.apache.cassandra.audit.AuditLogEntry;
 import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.cql3.QueryProcessor;
@@ -29,7 +29,9 @@ import org.apache.cassandra.cql3.statements.ParsedStatement;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.tracing.Tracing;
-import org.apache.cassandra.transport.*;
+import org.apache.cassandra.transport.CBUtil;
+import org.apache.cassandra.transport.Message;
+import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.cassandra.utils.UUIDGen;
 
@@ -97,8 +99,6 @@ public class PrepareMessage extends Message.Request
 
     public Message.Response execute(QueryState state, long queryStartNanoTime)
     {
-        AuditLogEntry auditEntry = null;
-
         try
         {
             UUID tracingId = null;
@@ -114,17 +114,13 @@ public class PrepareMessage extends Message.Request
                 Tracing.instance.begin("Preparing CQL3 query", state.getClientAddress(), ImmutableMap.of("query", query));
             }
 
-            if(auditLogEnabled)
-            {
-                ParsedStatement.Prepared parsedStmt = QueryProcessor.parseStatement(query, state.getClientState());
-                auditEntry = auditLogManager.getLogEntry(parsedStmt.statement, query, state, AuditLogEntryType.PREPARE_STATEMENT);
-            }
-
             Message.Response response = ClientState.getCQLQueryHandler().prepare(query,
                                                                                  state.getClientState().cloneWithKeyspaceIfSet(keyspace),
                                                                                  getCustomPayload());
             if(auditLogEnabled)
             {
+                ParsedStatement.Prepared parsedStmt = QueryProcessor.parseStatement(query, state.getClientState());
+                AuditLogEntry auditEntry = auditLogManager.getLogEntry(parsedStmt.statement, query, state, AuditLogEntryType.PREPARE_STATEMENT);
                 auditLogManager.log(auditEntry);
             }
 
@@ -135,7 +131,13 @@ public class PrepareMessage extends Message.Request
         }
         catch (Exception e)
         {
-            auditLogManager.log(auditEntry, e);
+            if(auditLogEnabled)
+            {
+                AuditLogEntry auditEntry = auditLogManager
+                                           .getLogEntry(query, state, AuditLogEntryType.PREPARE_STATEMENT)
+                                           .setKeyspace(keyspace);
+                auditLogManager.log(auditEntry, e);
+            }
             JVMStabilityInspector.inspectThrowable(e);
             return ErrorMessage.fromException(e);
         }

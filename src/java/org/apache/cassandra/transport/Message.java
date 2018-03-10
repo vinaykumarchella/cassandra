@@ -205,6 +205,7 @@ public abstract class Message
 
         protected final AuditLogManager auditLogManager = AuditLogManager.getInstance();
         protected boolean auditLogEnabled = auditLogManager.isAuditingEnabled();
+        protected boolean isLoggingEnabled = auditLogManager.isLoggingEnabled();
 
         protected Request(Type type)
         {
