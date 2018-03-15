@@ -34,6 +34,7 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.ParameterizedClass;
 import org.apache.cassandra.db.TypeSizes;
 import org.apache.cassandra.exceptions.ConfigurationException;
@@ -65,11 +66,8 @@ public final class CompressionParams
     public static final String ENABLED = "enabled";
     public static final String MIN_COMPRESS_RATIO = "min_compress_ratio";
 
-    public static final CompressionParams DEFAULT = new CompressionParams(LZ4Compressor.create(Collections.<String, String>emptyMap()),
-                                                                          DEFAULT_CHUNK_LENGTH,
-                                                                          calcMaxCompressedLength(DEFAULT_CHUNK_LENGTH, DEFAULT_MIN_COMPRESS_RATIO),
-                                                                          DEFAULT_MIN_COMPRESS_RATIO,
-                                                                          Collections.emptyMap());
+    public static final CompressionParams DEFAULT = getDefaultCompression();
+
 
     private static final String CRC_CHECK_CHANCE_WARNING = "The option crc_check_chance was deprecated as a compression option. " +
                                                            "You should specify it as a top-level table option instead";
@@ -461,6 +459,24 @@ public final class CompressionParams
         }
 
         return options.remove(SSTABLE_COMPRESSION);
+    }
+
+
+    private static CompressionParams getDefaultCompression()
+    {
+        switch (DatabaseDescriptor.getDefaultTableCompression().toLowerCase())
+        {
+            case "none":
+                return noCompression();
+            case "snappycompressor":
+                return snappy();
+            case "lz4compressor":
+                return lz4(DEFAULT_CHUNK_LENGTH, calcMaxCompressedLength(DEFAULT_CHUNK_LENGTH, DEFAULT_MIN_COMPRESS_RATIO));
+            case "deflatecompressor":
+                return deflate();
+            default:
+                return noCompression();
+        }
     }
 
     /**

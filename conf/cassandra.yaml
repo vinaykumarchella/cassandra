@@ -1168,3 +1168,6 @@ back_pressure_strategy:
 # The full query log will recrusively delete the contents of this path at
 # times. Don't place links in this directory to other parts of the filesystem.
 #full_query_log_dir: /tmp/cassandrafullquerylog
+
+# Default value for sstable compression that the new tables will inherit from.
+# default_table_compression: LZ4Compressor

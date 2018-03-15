@@ -2532,4 +2532,9 @@ public class DatabaseDescriptor
     {
         return conf.block_for_peers_timeout_in_secs;
     }
+
+    public static String getDefaultTableCompression()
+    {
+        return conf.table_compression_default;
+    }
 }

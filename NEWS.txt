@@ -38,6 +38,8 @@ using the provided 'sstableupgrade' tool.
 
 New features
 ------------
+   - CASSANDRA-12937: You can now set default table compression option in yaml so that all new tables would get the
+     default you wanted instead of C* default (LZ4Compression)
    - An experimental option to compare all merkle trees together has been added - for example, in
      a 3 node cluster with 2 replicas identical and 1 out-of-date, with this option enabled, the
      out-of-date replica will only stream a single copy from up-to-date replica. Enable it by adding
