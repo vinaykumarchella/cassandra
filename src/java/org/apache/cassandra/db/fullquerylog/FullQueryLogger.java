@@ -91,7 +91,7 @@ public class FullQueryLogger
     }
 
     /**
-     * Configure the global instance of the FullQueryLogger
+     * Configure the global instance of the FullQueryLogger. Clean the provided directory before starting
      * @param path Dedicated path where the FQL can store it's files.
      * @param rollCycle How often to roll FQL log segments so they can potentially be reclaimed
      * @param blocking Whether the FQL should block if the FQL falls behind or should drop log records
@@ -99,6 +99,20 @@ public class FullQueryLogger
      * @param maxLogSize Maximum size of the rolled files to retain on disk before deleting the oldest file
      */
     public synchronized void configure(Path path, String rollCycle, boolean blocking, int maxQueueWeight, long maxLogSize)
+    {
+        this.configure(path, rollCycle, blocking, maxQueueWeight, maxLogSize, true);
+    }
+
+    /**
+     * Configure the global instance of the FullQueryLogger
+     * @param path Dedicated path where the FQL can store it's files.
+     * @param rollCycle How often to roll FQL log segments so they can potentially be reclaimed
+     * @param blocking Whether the FQL should block if the FQL falls behind or should drop log records
+     * @param maxQueueWeight Maximum weight of in memory queue for records waiting to be written to the file before blocking or dropping
+     * @param maxLogSize Maximum size of the rolled files to retain on disk before deleting the oldest file
+     * @param cleanDirectory Indicates to clean the directory before starting FullQueryLogger or not
+     */
+    public synchronized void configure(Path path, String rollCycle, boolean blocking, int maxQueueWeight, long maxLogSize, boolean cleanDirectory)
     {
         Preconditions.checkNotNull(path, "path was null");
         File pathAsFile = path.toFile();
@@ -117,13 +131,16 @@ public class FullQueryLogger
             logger.warn("Full query logger already configured. Ignoring requested configuration.");
             throw new IllegalStateException("Already configured");
         }
-
-        if (path.toFile().exists())
+        if(cleanDirectory)
         {
-            Throwable error = cleanDirectory(path.toFile(), null);
-            if (error != null)
+            logger.info("Cleaning directory: {} as requested",path);
+            if (path.toFile().exists())
             {
-                throw new RuntimeException(error);
+                Throwable error = cleanDirectory(path.toFile(), null);
+                if (error != null)
+                {
+                    throw new RuntimeException(error);
+                }
             }
         }
 

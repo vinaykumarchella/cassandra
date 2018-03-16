@@ -68,6 +68,8 @@ New features
      See nodetool and fqltool help text for more information.
    - SSTableDump now supports the -l option to output each partition as it's own json object
      See CASSANDRA-13848 for more detail
+   - CASSANDRA-12151 Audit logging for database activity. Logs every incoming CQL command request, Authentication
+     (successful as well as unsuccessful login)to C* node.
 
 Upgrading
 ---------
