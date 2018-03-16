@@ -36,7 +36,7 @@ public class BinAuditLogger extends FullQueryLogger implements IAuditLogger
                                             DatabaseDescriptor.getAuditLoggingOptions().roll_cycle,
                                             DatabaseDescriptor.getAuditLoggingOptions().block,
                                             DatabaseDescriptor.getAuditLoggingOptions().max_queue_weight,
-                                            DatabaseDescriptor.getAuditLoggingOptions().max_log_size);
+                                            DatabaseDescriptor.getAuditLoggingOptions().max_log_size, false);
     }
 
     @Override

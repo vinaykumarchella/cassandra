@@ -18,50 +18,6 @@
 
 package org.apache.cassandra.audit;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import com.google.common.annotations.VisibleForTesting;
-
-import org.apache.cassandra.cql3.CQLStatement;
-import org.apache.cassandra.cql3.statements.AlterKeyspaceStatement;
-import org.apache.cassandra.cql3.statements.AlterRoleStatement;
-import org.apache.cassandra.cql3.statements.AlterTableStatement;
-import org.apache.cassandra.cql3.statements.AlterTypeStatement;
-import org.apache.cassandra.cql3.statements.AlterViewStatement;
-import org.apache.cassandra.cql3.statements.AuthenticationStatement;
-import org.apache.cassandra.cql3.statements.BatchStatement;
-import org.apache.cassandra.cql3.statements.CreateAggregateStatement;
-import org.apache.cassandra.cql3.statements.CreateFunctionStatement;
-import org.apache.cassandra.cql3.statements.CreateIndexStatement;
-import org.apache.cassandra.cql3.statements.CreateKeyspaceStatement;
-import org.apache.cassandra.cql3.statements.CreateRoleStatement;
-import org.apache.cassandra.cql3.statements.CreateTableStatement;
-import org.apache.cassandra.cql3.statements.CreateTriggerStatement;
-import org.apache.cassandra.cql3.statements.CreateTypeStatement;
-import org.apache.cassandra.cql3.statements.CreateViewStatement;
-import org.apache.cassandra.cql3.statements.DeleteStatement;
-import org.apache.cassandra.cql3.statements.DropAggregateStatement;
-import org.apache.cassandra.cql3.statements.DropFunctionStatement;
-import org.apache.cassandra.cql3.statements.DropIndexStatement;
-import org.apache.cassandra.cql3.statements.DropKeyspaceStatement;
-import org.apache.cassandra.cql3.statements.DropRoleStatement;
-import org.apache.cassandra.cql3.statements.DropTableStatement;
-import org.apache.cassandra.cql3.statements.DropTriggerStatement;
-import org.apache.cassandra.cql3.statements.DropTypeStatement;
-import org.apache.cassandra.cql3.statements.DropViewStatement;
-import org.apache.cassandra.cql3.statements.GrantPermissionsStatement;
-import org.apache.cassandra.cql3.statements.GrantRoleStatement;
-import org.apache.cassandra.cql3.statements.ListPermissionsStatement;
-import org.apache.cassandra.cql3.statements.ListRolesStatement;
-import org.apache.cassandra.cql3.statements.ListUsersStatement;
-import org.apache.cassandra.cql3.statements.RevokePermissionsStatement;
-import org.apache.cassandra.cql3.statements.RevokeRoleStatement;
-import org.apache.cassandra.cql3.statements.SelectStatement;
-import org.apache.cassandra.cql3.statements.TruncateStatement;
-import org.apache.cassandra.cql3.statements.UpdateStatement;
-import org.apache.cassandra.cql3.statements.UseStatement;
-
 public enum AuditLogEntryType
 {
     /**

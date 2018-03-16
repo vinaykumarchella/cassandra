@@ -45,19 +45,18 @@ public class AuditLogManager
 {
     public static final Logger logger = LoggerFactory.getLogger(AuditLogManager.class);
     private static final AuditLogManager instance = new AuditLogManager();
-    private final IAuditLogger auditLogger;
+    private IAuditLogger auditLogger;
     private AuditLogManager()
     {
         if (isAuditingEnabled())
         {
             logger.info("Audit logging is enabled.");
-
+            this.auditLogger = getAuditLogger();
         }
         else
         {
             logger.info("Audit logging is disabled.");
         }
-        this.auditLogger = getAuditLogger();
     }
 
     public static AuditLogManager getInstance()
