@@ -104,8 +104,14 @@ public class RangeStreamer
         private final String sourceDc;
         private final IEndpointSnitch snitch;
 
-        public SingleDatacenterFilter(IEndpointSnitch snitch, String sourceDc)
+
+        public SingleDatacenterFilter(IEndpointSnitch snitch, String sourceDc, TokenMetadata.Topology topology)
         {
+            Set<String> availableDcs = topology.getDatacenterEndpoints().keySet();
+           if(!availableDcs.contains(sourceDc))
+           {
+               throw new IllegalStateException("Provided datacenter: "+sourceDc+" is not a valid datacenter, available datacenters are: "+String.join(",", availableDcs));
+           }
             this.sourceDc = sourceDc;
             this.snitch = snitch;
         }

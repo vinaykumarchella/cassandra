@@ -1176,7 +1176,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
                                                        DatabaseDescriptor.getStreamingConnectionsPerHost());
             streamer.addSourceFilter(new RangeStreamer.FailureDetectorSourceFilter(FailureDetector.instance));
             if (sourceDc != null)
-                streamer.addSourceFilter(new RangeStreamer.SingleDatacenterFilter(DatabaseDescriptor.getEndpointSnitch(), sourceDc));
+                streamer.addSourceFilter(new RangeStreamer.SingleDatacenterFilter(DatabaseDescriptor.getEndpointSnitch(), sourceDc, tokenMetadata.cloneOnlyTokenMap().getTopology()));
 
             if (keyspace == null)
             {
