@@ -134,14 +134,9 @@ public class CreateTypeStatement extends SchemaAlteringStatement
         return new Event.SchemaChange(Event.SchemaChange.Change.CREATED, Event.SchemaChange.Target.TYPE, keyspace(), name.getStringTypeName());
     }
 
-    public String getStringTypeName()
-    {
-        return name.getStringTypeName();
-    }
-
     @Override
     public AuditLogContext getAuditLogContext()
     {
-        return new AuditLogContext(AuditLogEntryType.CREATE_TYPE, keyspace(), getStringTypeName());
+        return new AuditLogContext(AuditLogEntryType.CREATE_TYPE, keyspace(), name.getStringTypeName());
     }
 }

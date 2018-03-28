@@ -68,9 +68,8 @@ New features
      See nodetool and fqltool help text for more information.
    - SSTableDump now supports the -l option to output each partition as it's own json object
      See CASSANDRA-13848 for more detail
-   - CASSANDRA-12151 Audit logging for database activity. Logs every incoming CQL command request, Authentication
-     (successful as well as unsuccessful login)to C* node.
-
+   - CASSANDRA-12151 Support audit logging for database activity. If enabled, logs every incoming CQL command request,
+     Authentication (successful as well as unsuccessful login)to C* node.
 Upgrading
 ---------
     - Cassandra 4.0 removed support for COMPACT STORAGE tables. All Compact Tables

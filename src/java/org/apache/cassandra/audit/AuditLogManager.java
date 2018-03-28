@@ -43,7 +43,7 @@ import org.apache.cassandra.utils.FBUtilities;
 
 public class AuditLogManager
 {
-    public static final Logger logger = LoggerFactory.getLogger(AuditLogManager.class);
+    static final Logger logger = LoggerFactory.getLogger(AuditLogManager.class);
     private static final AuditLogManager instance = new AuditLogManager();
     private IAuditLogger auditLogger;
     private AuditLogManager()
@@ -160,6 +160,10 @@ public class AuditLogManager
 
     public void log(CQLStatement statement, String query, QueryOptions options, QueryState state, long queryStartNanoTime)
     {
+        /**
+         * We can run both the audit logger and the fq logger at the same time, hence this method ensures that it logs
+         * to both the channels at same time.
+         */
         if(isAuditingEnabled())
         {
             AuditLogEntry auditEntry = this.getLogEntry(statement, query, state, options);
@@ -190,13 +194,6 @@ public class AuditLogManager
         }
     }
 
-    public void logError(AuditLogEntry logEntry)
-    {
-        if (isAuditingEnabled() && (null == logEntry.getKeyspace() || !isSystemKeyspace(logEntry.getKeyspace())))
-        {
-            this.auditLogger.error(logEntry);
-        }
-    }
     /**
      * Native protocol/ CQL helper methods for Audit Logging
      */

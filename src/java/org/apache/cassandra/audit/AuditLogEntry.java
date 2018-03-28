@@ -17,23 +17,22 @@
  */
 package org.apache.cassandra.audit;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.Date;
 import java.util.UUID;
 
 import org.apache.commons.lang3.StringUtils;
 
 import org.apache.cassandra.auth.AuthenticatedUser;
+import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.utils.FBUtilities;
 
 public class AuditLogEntry
 {
 
-    private InetAddress host = FBUtilities.getJustBroadcastAddress();
-    private String source, user;
-    private int srcPort;
+    private final InetAddressAndPort host = FBUtilities.getBroadcastAddressAndPort();
+    private final String source, user;
+    private final int srcPort;
     private long timestamp;
     private AuditLogEntryType type;
     private UUID batch;
@@ -44,7 +43,7 @@ public class AuditLogEntry
         this.source = source;
         this.user = user;
         this.srcPort = srcPort;
-        this.timestamp = new Date().getTime();
+        this.timestamp = System.currentTimeMillis();
     }
 
     public AuditLogEntry(AuditLogEntryType type, String user, String source, int srcPort)
@@ -107,27 +106,10 @@ public class AuditLogEntry
         return builder.toString();
     }
 
-    public AuditLogEntry setUser(String user)
-    {
-        this.user = user;
-        return this;
-    }
 
     public String getUser()
     {
         return this.user;
-    }
-
-    public AuditLogEntry setSource(String source)
-    {
-        this.source = source;
-        return this;
-    }
-
-    public AuditLogEntry setHost(InetAddress host)
-    {
-        this.host = host;
-        return this;
     }
 
     public AuditLogEntry setTimestamp(long timestamp)

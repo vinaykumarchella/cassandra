@@ -21,8 +21,9 @@ import java.net.InetSocketAddress;
 
 import org.apache.cassandra.auth.AuthenticatedUser;
 
+
 public class AuditLogUtil
 {
-    public static final InetSocketAddress DEFAULT_SOURCE = new InetSocketAddress(0);
+    public static final InetSocketAddress DEFAULT_SOURCE =new InetSocketAddress("0.0.0.0",0);
     public static final AuthenticatedUser SYSTEM_USER = new AuthenticatedUser("system");
 }

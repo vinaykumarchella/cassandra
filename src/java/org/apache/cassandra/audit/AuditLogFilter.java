@@ -19,8 +19,8 @@ package org.apache.cassandra.audit;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.collect.ImmutableSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,31 +28,33 @@ import org.apache.cassandra.config.DatabaseDescriptor;
 
 public class AuditLogFilter
 {
-    public static final Logger logger = LoggerFactory.getLogger(AuditLogFilter.class);
+    private static final Logger logger = LoggerFactory.getLogger(AuditLogFilter.class);
 
-    private final AtomicReference<Set<String>> excludedKeyspaces = new AtomicReference<>();
-    private final AtomicReference<Set<String>> includedKeyspaces = new AtomicReference<>();
+    private volatile ImmutableSet<String> excludedKeyspaces = ImmutableSet.of();
+    private volatile ImmutableSet<String> includedKeyspaces = ImmutableSet.of();
 
-    private final AtomicReference<Set<String>> excludedCategories = new AtomicReference<>();
-    private final AtomicReference<Set<String>> includedCategories = new AtomicReference<>();
+    private volatile ImmutableSet<String> excludedCategories = ImmutableSet.of();
+    private volatile ImmutableSet<String> includedCategories = ImmutableSet.of();
 
-    private final AtomicReference<Set<String>> includedUsers = new AtomicReference<>();
-    private final AtomicReference<Set<String>> excludedUsers= new AtomicReference<>();
-
+    private volatile ImmutableSet<String> includedUsers = ImmutableSet.of();
+    private volatile ImmutableSet<String> excludedUsers = ImmutableSet.of();
 
     private static final AuditLogFilter instance = new AuditLogFilter();
 
-    public AuditLogFilter()
+    private AuditLogFilter()
     {
-       loadFilters();
+        loadFilters();
     }
 
     public static AuditLogFilter getInstance()
     {
-     return instance;
+        return instance;
     }
 
-    public void loadFilters()
+    /**
+     * (Re)Loads filters from config. This is being called during startup as well as JMX filter reload
+     */
+    public final void loadFilters()
     {
         logger.info("Loading AuditLog filters");
         Set<String> includedKeyspacesSet = new HashSet<>();
@@ -65,92 +67,85 @@ public class AuditLogFilter
         Set<String> excludedUsersSet = new HashSet<>();
         Set<String> includedUsersSet = new HashSet<>();
 
-        for (String keyspace : DatabaseDescriptor.getAuditLoggingOptions().included_keyspaces.split(","))
-        {
-            if(!keyspace.isEmpty())
-            {
-                includedKeyspacesSet.add(keyspace);
-            }
-        }
-        for (String keyspace : DatabaseDescriptor.getAuditLoggingOptions().excluded_keyspaces.split(","))
-        {
-            if(!keyspace.isEmpty())
-            {
-                excludedKeyspacesSet.add(keyspace);
-            }
-        }
+        loadInputSets(includedKeyspacesSet, DatabaseDescriptor.getAuditLoggingOptions().included_keyspaces,
+                      excludedKeyspacesSet, DatabaseDescriptor.getAuditLoggingOptions().excluded_keyspaces);
 
-        for (String keyspace : DatabaseDescriptor.getAuditLoggingOptions().included_categories.split(","))
-        {
-            if(!keyspace.isEmpty())
-            {
-                includedCategoriesSet.add(keyspace);
-            }
-        }
-        for (String keyspace : DatabaseDescriptor.getAuditLoggingOptions().excluded_categories.split(","))
-        {
-            if(!keyspace.isEmpty())
-            {
-                excludedCategoriesSet.add(keyspace);
-            }
-        }
+        loadInputSets(includedCategoriesSet, DatabaseDescriptor.getAuditLoggingOptions().included_categories,
+                      excludedCategoriesSet, DatabaseDescriptor.getAuditLoggingOptions().excluded_categories);
 
-        for (String user : DatabaseDescriptor.getAuditLoggingOptions().included_users.split(","))
-        {
-            if(!user.isEmpty())
-            {
-                includedUsersSet.add(user);
-            }
-        }
-        for (String user : DatabaseDescriptor.getAuditLoggingOptions().excluded_users.split(","))
-        {
-            if(!user.isEmpty())
-            {
-                excludedUsersSet.add(user);
-            }
-        }
+        loadInputSets(includedUsersSet, DatabaseDescriptor.getAuditLoggingOptions().included_users,
+                      excludedUsersSet, DatabaseDescriptor.getAuditLoggingOptions().excluded_users);
 
-        includedKeyspaces.set(includedKeyspacesSet);
-        excludedKeyspaces.set(excludedKeyspacesSet);
 
-        includedCategories.set(includedCategoriesSet);
-        excludedCategories.set(excludedCategoriesSet);
+        includedKeyspaces = ImmutableSet.copyOf(includedKeyspacesSet);
+        excludedKeyspaces = ImmutableSet.copyOf(excludedKeyspacesSet);
 
-        includedUsers.set(includedUsersSet);
-        excludedUsers.set(excludedUsersSet);
+        includedCategories = ImmutableSet.copyOf(includedCategoriesSet);
+        excludedCategories = ImmutableSet.copyOf(excludedCategoriesSet);
+
+        includedUsers = ImmutableSet.copyOf(includedUsersSet);
+        excludedUsers = ImmutableSet.copyOf(excludedUsersSet);
     }
 
-    public boolean isFiltered(AuditLogEntry auditLogEntry)
+    /**
+     * Constructs mutually exclusive sets with excluded set being the default option when there are conlicting inputs
+     */
+    private void loadInputSets(Set<String> includedSet, String includedInput, Set<String> excludedSet, String excludedInput)
     {
-        return isFiltered(auditLogEntry.getKeyspace(),includedKeyspaces,excludedKeyspaces)
-               || isFiltered(auditLogEntry.getType().getCategory(),includedCategories,excludedCategories)
-               || isFiltered(auditLogEntry.getUser(),includedUsers,excludedUsers);
+        for (String keyspace : excludedInput.split(","))
+        {
+            if (!keyspace.isEmpty())
+            {
+                excludedSet.add(keyspace);
+            }
+        }
+        for (String keyspace : includedInput.split(","))
+        {
+            //Ensure both included and excluded sets are mutually exclusive
+            if (!keyspace.isEmpty() && !excludedSet.contains(keyspace))
+            {
+                includedSet.add(keyspace);
+            }
+        }
     }
 
-    private boolean isFiltered(String input, AtomicReference<Set<String>> includeSet, AtomicReference<Set<String>> excludeSet)
+    /**
+     * Checks whether a give AuditLog Entry is filtered or not
+     *
+     * @param auditLogEntry AuditLogEntry to verify
+     * @return true if it is filtered, false otherwise
+     */
+    boolean isFiltered(AuditLogEntry auditLogEntry)
+    {
+        return isFiltered(auditLogEntry.getKeyspace(), includedKeyspaces, excludedKeyspaces)
+               || isFiltered(auditLogEntry.getType().getCategory(), includedCategories, excludedCategories)
+               || isFiltered(auditLogEntry.getUser(), includedUsers, excludedUsers);
+    }
+
+    /**
+     * Checks whether given input is being filtered or not.
+     * If includeSet does not contain any items, by default everything is included
+     * If excludeSet does not contain any items, by default nothing is excluded.
+     * If an input is part of both includeSet and excludeSet, excludeSet takes the priority over includeSet
+     *
+     * @param input      Input to be checked for filtereing based on includeSet and excludeSet
+     * @param includeSet Include filtering set
+     * @param excludeSet Exclude filtering set
+     * @return true if the input is filtered, false when the input is not filtered
+     */
+    private boolean isFiltered(String input, Set<String> includeSet, Set<String> excludeSet)
     {
         if (input != null && !input.isEmpty())
         {
-            boolean isExcluded = false;
-            if (excludeSet.get() != null && excludeSet.get().size() > 0)
+            if (excludeSet.size() > 0)
             {
-                isExcluded = excludeSet.get().contains(input);
+                return excludeSet.contains(input);
             }
-            if (isExcluded)
+            else if (includeSet.size() > 0)
             {
-                return true;
-            }
-            else
-            {
-                boolean isIncluded = true;
-                if (includeSet.get() != null && includeSet.get().size() > 0)
-                {
-                    isIncluded = includeSet.get().contains(input);
-                }
-                return !isIncluded;
+                return !includeSet.contains(input);
             }
         }
         return false;
     }
-
 }

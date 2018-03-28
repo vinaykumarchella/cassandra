@@ -122,14 +122,9 @@ public class DropTypeStatement extends SchemaAlteringStatement
         return new Event.SchemaChange(Event.SchemaChange.Change.DROPPED, Event.SchemaChange.Target.TYPE, keyspace(), name.getStringTypeName());
     }
 
-    public String getStringTypeName()
-    {
-        return name.getStringTypeName();
-    }
-
     @Override
     public AuditLogContext getAuditLogContext()
     {
-        return new AuditLogContext(AuditLogEntryType.DROP_TYPE, keyspace(), getStringTypeName());
+        return new AuditLogContext(AuditLogEntryType.DROP_TYPE, keyspace(), name.getStringTypeName());
     }
 }
