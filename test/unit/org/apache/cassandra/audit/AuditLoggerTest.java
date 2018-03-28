@@ -110,6 +110,16 @@ public class AuditLoggerTest extends CQLTester
         cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
         rs  = executeAndAssertNoAuditLog(cql, 1);
         assertEquals(1, rs.all().size());
+
+        options = new AuditLogOptions();
+        options.enabled = true;
+        options.logger = "InMemoryAuditLogger";
+        DatabaseDescriptor.setAuditLoggingOptions(options);
+        StorageService.instance.reloadAuditLogFilters();
+
+        cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
+        rs  = executeAndAssertWithPrepare(cql, AuditLogEntryType.SELECT, 1);
+        assertEquals(1, rs.all().size());
     }
 
 

@@ -26,9 +26,9 @@ public interface IAuditLogContext
 
     static class AuditLogContext
     {
-        public AuditLogEntryType auditLogEntryType;
-        public String keyspace;
-        public String scope;
+        public final AuditLogEntryType auditLogEntryType;
+        public final String keyspace;
+        public final String scope;
 
         public AuditLogContext(AuditLogEntryType auditLogEntryType)
         {

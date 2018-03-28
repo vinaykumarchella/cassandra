@@ -114,11 +114,6 @@ public abstract class AlterTypeStatement extends SchemaAlteringStatement
                      });
     }
 
-    public String getStringTypeName()
-    {
-        return name.getStringTypeName();
-    }
-
     private static class Add extends AlterTypeStatement
     {
         private final FieldIdentifier fieldName;
@@ -194,6 +189,6 @@ public abstract class AlterTypeStatement extends SchemaAlteringStatement
     @Override
     public AuditLogContext getAuditLogContext()
     {
-        return new AuditLogContext(AuditLogEntryType.ALTER_TYPE, keyspace(), getStringTypeName());
+        return new AuditLogContext(AuditLogEntryType.ALTER_TYPE, keyspace(), name.getStringTypeName());
     }
 }

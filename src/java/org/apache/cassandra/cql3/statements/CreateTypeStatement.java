@@ -149,6 +149,6 @@ public class CreateTypeStatement extends SchemaAlteringStatement
     @Override
     public AuditLogContext getAuditLogContext()
     {
-        return new AuditLogContext(AuditLogEntryType.CREATE_TYPE, keyspace(), getStringTypeName());
+        return new AuditLogContext(AuditLogEntryType.CREATE_TYPE, keyspace(), name.getStringTypeName());
     }
 }

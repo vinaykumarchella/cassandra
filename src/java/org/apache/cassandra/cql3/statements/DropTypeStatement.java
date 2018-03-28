@@ -138,6 +138,6 @@ public class DropTypeStatement extends SchemaAlteringStatement
     @Override
     public AuditLogContext getAuditLogContext()
     {
-        return new AuditLogContext(AuditLogEntryType.DROP_TYPE, keyspace(), getStringTypeName());
+        return new AuditLogContext(AuditLogEntryType.DROP_TYPE, keyspace(), name.getStringTypeName());
     }
 }

@@ -39,7 +39,8 @@ Audit logging captures following events
 
 What does it log
 ^^^^^^^^^^^^^^^^^
-It logs following attributes
+Each audit log implementation has access to the following attributes, and for the default text based logger these fields are concatenated with `|` s to yield the final message.
+
  - ``user``: User name(if available)
  - ``host``: Host IP, where the command is being executed
  - ``source ip address``: Source IP address from where the request initiated
@@ -53,7 +54,7 @@ It logs following attributes
 
 How to configure
 ^^^^^^^^^^^^^^^^^
-enabled: This option enables/ disables audit log
+``enabled``: This option enables/ disables audit log
 ``logger``: Class name of the logger/ custom logger.
 ``included_keyspaces``: Comma separated list of keyspaces to be included in audit log, default - includes all keyspaces
 ``excluded_keyspaces``: Comma separated list of keyspaces to be excluded from audit log, default - excludes no keyspace
