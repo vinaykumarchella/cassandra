@@ -16,6 +16,8 @@
 
 .. highlight:: none
 
+
+
 Audit Logging
 ------------------
 
@@ -23,10 +25,11 @@ Audit logging in Cassandra logs every incoming CQL command request, Authenticati
 to C* node. Currently, there are two implementations provided, the custom logger can be implemented and injected with the
 class name as a parameter in cassandra.yaml.
 
-- ``FileAuditLogger`` Logs events to  ``audit/audit.log`` file using slf4j logger.
 - ``BinAuditLogger`` An efficient way to log events to ``${cassandra.logdir.audit}``
    or ``${cassandra.logdir}/audit/`` directory in binary format.
+- ``FileAuditLogger`` Logs events to  ``audit/audit.log`` file using slf4j logger.
 
+*Recommendation* ``BinAuditLogger`` is a community recommended logger considering the performance
 
 What does it capture
 ^^^^^^^^^^^^^^^^^
@@ -70,3 +73,32 @@ Sample output
 
     LogMessage: user:anonymous|host:localhost/X.X.X.X|source:/X.X.X.X|port:60878|timestamp:1521158923615|type:USE_KS|category:DDL|ks:dev1|operation:USE "dev1"
 
+
+
+Configuring FileAuditLogger
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+To use ``FileAuditLogger`` as a logger in AuditLogging, apart from setting the class name in cassandra.yaml, following configuration is needed to have the audit log events to flow through separate log file instead of system.log
+
+
+.. code-block:: xml
+
+    	<!-- Audit Logging (FileAuditLogger) rolling file appender to audit.log -->
+    	<appender name="FileAuditLoggerAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	  <file>${cassandra.logdir}/audit/audit.log</file>
+    	  <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+    	    <!-- rollover daily -->
+    	    <fileNamePattern>${cassandra.logdir}/audit/audit.log.%d{yyyy-MM-dd}.%i.zip</fileNamePattern>
+    	    <!-- each file should be at most 50MB, keep 30 days worth of history, but at most 5GB -->
+    	    <maxFileSize>50MB</maxFileSize>
+    	    <maxHistory>30</maxHistory>
+    	    <totalSizeCap>5GB</totalSizeCap>
+    	  </rollingPolicy>
+    	  <encoder>
+    	    <pattern>%-5level [%thread] %date{ISO8601} %F:%L - %msg%n</pattern>
+    	  </encoder>
+    	</appender>
+
+      	<!-- Audit Logging additivity to redirect audt logging events to audit/audit.log -->
+      	<logger name="org.apache.cassandra.audit" additivity="false" level="INFO">
+        	<appender-ref ref="FileAuditLoggerAppender"/>
+      	</logger>

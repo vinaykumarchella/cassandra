@@ -135,16 +135,13 @@ public class AuditLogFilter
      */
     private boolean isFiltered(String input, Set<String> includeSet, Set<String> excludeSet)
     {
-        if (input != null && !input.isEmpty())
+        if (excludeSet.size() > 0)
         {
-            if (excludeSet.size() > 0)
-            {
-                return excludeSet.contains(input);
-            }
-            else if (includeSet.size() > 0)
-            {
-                return !includeSet.contains(input);
-            }
+            return excludeSet.contains(input);
+        }
+        else if (includeSet.size() > 0)
+        {
+            return !includeSet.contains(input);
         }
         return false;
     }
