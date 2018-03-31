@@ -1171,15 +1171,12 @@ back_pressure_strategy:
 
 
 # Audit logging - Logs every incoming CQL command request, Authentication (successful as well as unsuccessful login)
-# to C* node. Currently there are two implementations provided, FileAuditLogger which logs events to audit/audit.log file
-# using slf4j logger . BinAuditLogger, an efficient way to log events to "${cassandra.logdir.audit}" or "${cassandra.logdir}/audit/" directory
-# in binary format.
-# Custom logger can be implemented and injected here with the class name.
+# to C* node. Custom logger can be implemented and injected here with the class name.
 # system keyspaces are excluded from audit log.
 # enabled: This option enables/ disables audit log
 # logger: Class name of the logger/ custom logger. Available logger implementation are
-#         "FileAuditLogger" - Uses SLF4J to log events, Human readable format
-#         "BinAuditLogger" = Efficient way to log events to file, Binary format
+#         "BinAuditLogger" - Efficient way to log events to file, Binary format. Default location: "${cassandra.logdir.audit}"
+#         or "${cassandra.logdir}/audit/" directory.
 # included_keyspaces: comma separated list of keyspaces to be included for audit log, default - includes all keyspaces
 # excluded_keyspaces: comma separated list of keyspaces to be excluded for audit log, default - excludes no keyspace
 # included_categories: comma separated list of Audit Log Categories to be included for audit log, default - includes all categories

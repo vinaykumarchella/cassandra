@@ -72,7 +72,7 @@ public class AuditLogManager
         {
             return FBUtilities.newAuditLogger(loggerClassName);
         }
-        return FBUtilities.newAuditLogger(FileAuditLogger.class.getName());
+        return FBUtilities.newAuditLogger(BinAuditLogger.class.getName());
     }
 
     @VisibleForTesting
@@ -104,7 +104,6 @@ public class AuditLogManager
      */
     public void log(AuditLogEntry logEntry)
     {
-        //TODO: Look into the design aspects of async based audit logging from LogManager(here) or leave it to implementers of IAuditLogger
         if (isAuditingEnabled()
             && (null != logEntry)
             && ((null == logEntry.getKeyspace()) || !isSystemKeyspace(logEntry.getKeyspace()))
