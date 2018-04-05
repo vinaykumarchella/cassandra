@@ -17,10 +17,12 @@
  */
 package org.apache.cassandra.audit;
 
+import org.apache.cassandra.config.ParameterizedClass;
+
 public class AuditLogOptions
 {
     public boolean enabled = false;
-    public String logger = BinAuditLogger.class.getName();
+    public ParameterizedClass logger;
     public String included_keyspaces = "";
     public String excluded_keyspaces = "";
     public String included_categories = "";

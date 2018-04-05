@@ -18,19 +18,22 @@
 
 package org.apache.cassandra.audit;
 
+import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.config.ParameterizedClass;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.statements.ParsedStatement;
@@ -50,7 +53,6 @@ public class AuditLogManager
     {
         if (isAuditingEnabled())
         {
-            logger.info("Audit logging is enabled.");
             this.auditLogger = getAuditLogger();
         }
         else
@@ -67,12 +69,35 @@ public class AuditLogManager
 
     private IAuditLogger getAuditLogger()
     {
-        String loggerClassName = DatabaseDescriptor.getAuditLoggingOptions().logger;
-        if(loggerClassName !=null)
+        ParameterizedClass defaultAuditLogger = new ParameterizedClass(BinAuditLogger.class.getName(), ImmutableMap.of());
+        IAuditLogger auditLogger = null;
+        try
         {
-            return FBUtilities.newAuditLogger(loggerClassName);
+            ParameterizedClass auditLoggerClz = DatabaseDescriptor.getAuditLoggingOptions().logger;
+            if (auditLoggerClz != null)
+            {
+                Class<?> clazz = Class.forName(auditLoggerClz.class_name);
+                if (IAuditLogger.class.isAssignableFrom(clazz))
+                {
+                    Constructor<?> ctor = clazz.getConstructor(Map.class);
+                    auditLogger = (IAuditLogger) ctor.newInstance(auditLoggerClz.parameters);
+                }
+                else
+                {
+                    logger.error(auditLoggerClz + " is not an instance of " + IAuditLogger.class.getCanonicalName() + ", using default AuditLogger");
+                }
+            }
         }
-        return FBUtilities.newAuditLogger(BinAuditLogger.class.getName());
+        catch (Exception e)
+        {
+            logger.error("Exception in initializing AuditLogger with implementation of [{}], proceeding with default AuditLogger", DatabaseDescriptor.getAuditLoggingOptions().logger);
+        }
+        if (auditLogger == null)
+        {
+            auditLogger = FBUtilities.newAuditLogger(defaultAuditLogger.class_name);
+        }
+        logger.info("AuditLogger is {} with implementation of {}.", DatabaseDescriptor.getAuditLoggingOptions().enabled ? "enabled" : "disabled", auditLogger.getClass().getName());
+        return auditLogger;
     }
 
     @VisibleForTesting
