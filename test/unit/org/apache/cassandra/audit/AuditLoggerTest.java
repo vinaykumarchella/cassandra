@@ -17,6 +17,7 @@
  */
 package org.apache.cassandra.audit;
 
+import com.google.common.collect.ImmutableMap;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -29,6 +30,7 @@ import com.datastax.driver.core.Session;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.exceptions.SyntaxError;
 import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.config.ParameterizedClass;
 import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.service.StorageService;
 
@@ -47,10 +49,9 @@ public class AuditLoggerTest extends CQLTester
         DatabaseDescriptor.setAuditLogEnabled(true);
         AuditLogOptions options = new AuditLogOptions();
         options.enabled = true;
-        options.logger = "InMemoryAuditLogger";
+        options.logger = new ParameterizedClass("InMemoryAuditLogger", ImmutableMap.of());
         DatabaseDescriptor.setAuditLoggingOptions(options);
         requireNetwork();
-
     }
 
     @Before
@@ -58,7 +59,7 @@ public class AuditLoggerTest extends CQLTester
     {
         AuditLogOptions options = new AuditLogOptions();
         options.enabled = true;
-        options.logger = "InMemoryAuditLogger";
+        options.logger = new ParameterizedClass("InMemoryAuditLogger", ImmutableMap.of());
         DatabaseDescriptor.setAuditLoggingOptions(options);
         StorageService.instance.reloadAuditLogFilters();
 
@@ -79,7 +80,7 @@ public class AuditLoggerTest extends CQLTester
 
         AuditLogOptions options = new AuditLogOptions();
         options.enabled = true;
-        options.logger = "InMemoryAuditLogger";
+        options.logger = new ParameterizedClass("InMemoryAuditLogger", ImmutableMap.of());
         options.excluded_keyspaces = KEYSPACE;
         DatabaseDescriptor.setAuditLoggingOptions(options);
         StorageService.instance.reloadAuditLogFilters();
@@ -90,7 +91,7 @@ public class AuditLoggerTest extends CQLTester
 
         options = new AuditLogOptions();
         options.enabled = true;
-        options.logger = "InMemoryAuditLogger";
+        options.logger = new ParameterizedClass("InMemoryAuditLogger", ImmutableMap.of());
         options.included_keyspaces = KEYSPACE;
         DatabaseDescriptor.setAuditLoggingOptions(options);
         StorageService.instance.reloadAuditLogFilters();
@@ -101,7 +102,7 @@ public class AuditLoggerTest extends CQLTester
 
         options = new AuditLogOptions();
         options.enabled = true;
-        options.logger = "InMemoryAuditLogger";
+        options.logger = new ParameterizedClass("InMemoryAuditLogger", ImmutableMap.of());
         options.included_keyspaces = KEYSPACE;
         options.excluded_keyspaces = KEYSPACE;
         DatabaseDescriptor.setAuditLoggingOptions(options);
@@ -113,7 +114,7 @@ public class AuditLoggerTest extends CQLTester
 
         options = new AuditLogOptions();
         options.enabled = true;
-        options.logger = "InMemoryAuditLogger";
+        options.logger = new ParameterizedClass("InMemoryAuditLogger", ImmutableMap.of());
         DatabaseDescriptor.setAuditLoggingOptions(options);
         StorageService.instance.reloadAuditLogFilters();
 

@@ -19,6 +19,7 @@ package org.apache.cassandra.audit;
 
 import java.nio.file.Path;
 
+import com.google.common.collect.ImmutableMap;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -30,6 +31,7 @@ import net.openhft.chronicle.queue.ChronicleQueueBuilder;
 import net.openhft.chronicle.queue.ExcerptTailer;
 import net.openhft.chronicle.queue.RollCycles;
 import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.config.ParameterizedClass;
 import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.utils.binlog.BinLogTest;
 
@@ -52,7 +54,7 @@ public class BinAuditLoggerTest extends CQLTester
         DatabaseDescriptor.setAuditLogEnabled(true);
         AuditLogOptions options = new AuditLogOptions();
         options.enabled = true;
-        options.logger = "BinAuditLogger";
+        options.logger = new ParameterizedClass("BinAuditLogger", ImmutableMap.of());
         options.roll_cycle = "TEST_SECONDLY";
         options.audit_logs_dir = tempDir.toString();
         DatabaseDescriptor.setAuditLoggingOptions(options);
