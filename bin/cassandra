@@ -139,7 +139,7 @@ launch_service()
     props="$3"
     class="$4"
     cassandra_parms="-Dlogback.configurationFile=logback.xml"
-    #cassandra_parms="$cassandra_parms -Dcassandra.logdir=$CASSANDRA_HOME/logs"
+    cassandra_parms="$cassandra_parms -Dcassandra.logdir=$CASS_LOGS_DIR"
     cassandra_parms="$cassandra_parms -Dcassandra.storagedir=$cassandra_storagedir"
 
     if [ "x$pidpath" != "x" ]; then
