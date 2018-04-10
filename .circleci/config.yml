@@ -61,7 +61,7 @@ env_settings: &env_settings
     # <<: *default_env_settings
     <<: *high_capacity_env_settings
 env_vars: &env_vars
-    # <<: *resource_constrained_env_vars
+    #<<: *resource_constrained_env_vars
     <<: *high_capacity_env_vars
 workflows:
     version: 2
