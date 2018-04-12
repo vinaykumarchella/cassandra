@@ -48,17 +48,6 @@ public class BinAuditLogger extends FullQueryLogger implements IAuditLogger
         }
     }
 
-    @Override
-    public void error(AuditLogEntry logMessage)
-    {
-
-        if(logMessage != null)
-        {
-            this.log(logMessage.toString());
-        }
-    }
-
-
     /**
      * Log AuditLog message
      * @param message Audit Log Message
@@ -72,9 +61,6 @@ public class BinAuditLogger extends FullQueryLogger implements IAuditLogger
         }
         super.logRecord(new WeighableMarshallableMessage(message), binLog);
     }
-
-
-
 
     static class WeighableMarshallableMessage extends BinLog.ReleaseableWriteMarshallable implements WeightedQueue.Weighable
     {

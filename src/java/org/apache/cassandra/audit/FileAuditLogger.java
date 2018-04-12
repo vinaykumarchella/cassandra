@@ -35,9 +35,4 @@ public class FileAuditLogger implements IAuditLogger
         logger.info(logMessage.toString());
     }
 
-    @Override
-    public void error(AuditLogEntry logMessage)
-    {
-        logger.error(logMessage.toString());
-    }
 }

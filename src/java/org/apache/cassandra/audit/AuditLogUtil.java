@@ -18,12 +18,43 @@
 package org.apache.cassandra.audit;
 
 import java.net.InetSocketAddress;
-
-import org.apache.cassandra.auth.AuthenticatedUser;
+import java.util.Set;
 
 
 public class AuditLogUtil
 {
     public static final InetSocketAddress DEFAULT_SOURCE =new InetSocketAddress("0.0.0.0",0);
-    public static final AuthenticatedUser SYSTEM_USER = new AuthenticatedUser("system");
+
+    /**
+     * Checks whether given input is being filtered or not.
+     * If includeSet does not contain any items, by default everything is included
+     * If excludeSet does not contain any items, by default nothing is excluded.
+     * If an input is part of both includeSet and excludeSet, excludeSet takes the priority over includeSet
+     *
+     * @param input      Input to be checked for filtereing based on includeSet and excludeSet
+     * @param includeSet Include filtering set
+     * @param excludeSet Exclude filtering set
+     * @return true if the input is filtered, false when the input is not filtered
+     */
+    public static boolean isFiltered(String input, Set<String> includeSet, Set<String> excludeSet)
+    {
+        boolean isExcluded = false;
+        if (excludeSet.size() > 0)
+        {
+            isExcluded = excludeSet.contains(input);
+        }
+        if (isExcluded)
+        {
+            return true;
+        }
+        else
+        {
+            boolean isIncluded = true;
+            if (includeSet.size() > 0)
+            {
+                isIncluded = includeSet.contains(input);
+            }
+            return !isIncluded;
+        }
+    }
 }

@@ -117,32 +117,9 @@ public class AuditLogFilter
      */
     boolean isFiltered(AuditLogEntry auditLogEntry)
     {
-        return isFiltered(auditLogEntry.getKeyspace(), includedKeyspaces, excludedKeyspaces)
-               || isFiltered(auditLogEntry.getType().getCategory(), includedCategories, excludedCategories)
-               || isFiltered(auditLogEntry.getUser(), includedUsers, excludedUsers);
+        return AuditLogUtil.isFiltered(auditLogEntry.getKeyspace(), includedKeyspaces, excludedKeyspaces)
+               || AuditLogUtil.isFiltered(auditLogEntry.getType().getCategory(), includedCategories, excludedCategories)
+               || AuditLogUtil.isFiltered(auditLogEntry.getUser(), includedUsers, excludedUsers);
     }
 
-    /**
-     * Checks whether given input is being filtered or not.
-     * If includeSet does not contain any items, by default everything is included
-     * If excludeSet does not contain any items, by default nothing is excluded.
-     * If an input is part of both includeSet and excludeSet, excludeSet takes the priority over includeSet
-     *
-     * @param input      Input to be checked for filtereing based on includeSet and excludeSet
-     * @param includeSet Include filtering set
-     * @param excludeSet Exclude filtering set
-     * @return true if the input is filtered, false when the input is not filtered
-     */
-    private boolean isFiltered(String input, Set<String> includeSet, Set<String> excludeSet)
-    {
-        if (excludeSet.size() > 0)
-        {
-            return excludeSet.contains(input);
-        }
-        else if (includeSet.size() > 0)
-        {
-            return !includeSet.contains(input);
-        }
-        return false;
-    }
 }

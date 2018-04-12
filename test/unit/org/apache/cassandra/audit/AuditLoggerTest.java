@@ -122,6 +122,43 @@ public class AuditLoggerTest extends CQLTester
         assertEquals(1, rs.all().size());
     }
 
+    @Test
+    public void testAuditLogFilterIncludeExclude() throws Throwable
+    {
+        createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
+        String tbl1 = currentTable();
+        execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 1, "Apache", "Cassandra");
+        execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 2, "trace", "test");
+
+
+        AuditLogOptions options = new AuditLogOptions();
+        options.enabled = true;
+        options.logger = "InMemoryAuditLogger";
+        options.excluded_categories = "QUERY";
+        options.included_categories = "QUERY,DML";
+        DatabaseDescriptor.setAuditLoggingOptions(options);
+        StorageService.instance.reloadAuditLogFilters();
+
+        //QUERY - Should be filtered, part of excluded categories,
+        String cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = 1";
+        Session session = sessionNet();
+        ResultSet rs = session.execute(cql);
+
+        assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
+        assertEquals(1, rs.all().size());
+
+        //DML - Should not be filtered, part of included categories
+        cql = "INSERT INTO " + KEYSPACE + '.' + currentTable() + " (id, v1, v2) VALUES (?, ?, ?)";
+        executeAndAssertWithPrepare(cql, AuditLogEntryType.UPDATE, 1, "insert_audit", "test");
+
+
+        //DDL - Should be filtered, not part of included categories
+        cql = "ALTER TABLE  " + KEYSPACE + '.' + currentTable() + " ADD v3 text";
+        session = sessionNet();
+        rs = session.execute(cql);
+        assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
+    }
+
 
     @Test
     public void testCqlSELECTAuditing() throws Throwable

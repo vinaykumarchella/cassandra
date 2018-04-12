@@ -23,10 +23,7 @@ import java.util.Queue;
 public class InMemoryAuditLogger implements IAuditLogger
 {
     public static InMemoryAuditLogger instance = null;
-
-
     public final Queue<AuditLogEntry> inMemQueue = new LinkedList<>();
-    public final Queue<AuditLogEntry> inMemQueueErr = new LinkedList<>();
 
     public static InMemoryAuditLogger getInstance()
     {
@@ -37,15 +34,9 @@ public class InMemoryAuditLogger implements IAuditLogger
         return instance;
     }
 
-
     public void log(AuditLogEntry logMessage)
     {
 
         inMemQueue.offer(logMessage);
-    }
-
-    public void error(AuditLogEntry logMessage)
-    {
-        inMemQueueErr.offer(logMessage);
     }
 }

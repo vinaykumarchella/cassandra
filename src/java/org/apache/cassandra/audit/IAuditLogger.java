@@ -25,6 +25,4 @@ package org.apache.cassandra.audit;
 public abstract interface IAuditLogger
 {
     public abstract void log(AuditLogEntry logMessage);
-
-    public abstract void error(AuditLogEntry logMessage);
 }
