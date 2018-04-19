@@ -59,7 +59,7 @@ public enum AuditLogEntryType
     LIST_PERMISSIONS("DCL"),
     ALTER_TYPE("DDL"),
     CREATE_ROLE("DCL"),
-    USE_KS("DDL"),
+    USE_KS("OTHER"),
 
 
     /**
