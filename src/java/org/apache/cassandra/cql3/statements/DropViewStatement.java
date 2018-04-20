@@ -75,6 +75,7 @@ public class DropViewStatement extends SchemaAlteringStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
+
     @Override
     public AuditLogContext getAuditLogContext()
     {

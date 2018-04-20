@@ -348,17 +348,17 @@ public class AuditLoggerTest extends CQLTester
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
 
         String cql = "CREATE KEYSPACE "+createKeyspaceName()+" WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 2}  ";
-        executeAndAssert(cql, AuditLogEntryType.CREATE_KS, true, currentKeyspace());
+        executeAndAssert(cql, AuditLogEntryType.CREATE_KEYSPACE, true, currentKeyspace());
 
         cql = "CREATE KEYSPACE IF NOT EXISTS "+createKeyspaceName()+" WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 2}  ";
-        executeAndAssert(cql, AuditLogEntryType.CREATE_KS, true, currentKeyspace());
+        executeAndAssert(cql, AuditLogEntryType.CREATE_KEYSPACE, true, currentKeyspace());
 
 
         cql = "ALTER KEYSPACE "+currentKeyspace()+" WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 2}  ";
-        executeAndAssert(cql, AuditLogEntryType.ALTER_KS, true, currentKeyspace());
+        executeAndAssert(cql, AuditLogEntryType.ALTER_KEYSPACE, true, currentKeyspace());
 
         cql = "DROP KEYSPACE "+currentKeyspace();
-        executeAndAssert(cql, AuditLogEntryType.DROP_KS, true, currentKeyspace());
+        executeAndAssert(cql, AuditLogEntryType.DROP_KEYSPACE, true, currentKeyspace());
     }
 
     @Test
@@ -452,10 +452,10 @@ public class AuditLoggerTest extends CQLTester
         String tblName = createTableName();
 
         String cql = "CREATE FUNCTION IF NOT EXISTS  "+KEYSPACE+"."+tblName+" (column TEXT,num int) RETURNS NULL ON NULL INPUT RETURNS text LANGUAGE javascript AS $$ column.substring(0,num) $$";
-        executeAndAssert(cql, AuditLogEntryType.CREATE_FUNC);
+        executeAndAssert(cql, AuditLogEntryType.CREATE_FUNCTION);
 
         cql = "DROP FUNCTION "+KEYSPACE+"."+tblName;
-        executeAndAssert(cql, AuditLogEntryType.DROP_FUNC);
+        executeAndAssert(cql, AuditLogEntryType.DROP_FUNCTION);
 
     }
 
@@ -480,7 +480,7 @@ public class AuditLoggerTest extends CQLTester
         String aggName = createTableName();
 
         String cql = "DROP AGGREGATE IF EXISTS "+KEYSPACE+"."+aggName;
-        executeAndAssert(cql, AuditLogEntryType.DROP_AGG);
+        executeAndAssert(cql, AuditLogEntryType.DROP_AGGREGATE);
 
     }
 

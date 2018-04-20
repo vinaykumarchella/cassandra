@@ -242,10 +242,11 @@ public class BatchMessage extends Message.Request
         {
             if(auditLogEnabled)
             {
-                AuditLogEntry event = auditLogManager.getLogEntry(getAuditString(), state, this.options);
+                AuditLogEntry event = AuditLogEntry.getLogEntry(getAuditString(), state, this.options);
                 event.setType(AuditLogEntryType.BATCH);
                 auditLogManager.log(event, e);
             }
+
             JVMStabilityInspector.inspectThrowable(e);
             return ErrorMessage.fromException(e);
         }
@@ -271,7 +272,6 @@ public class BatchMessage extends Message.Request
 
     private String getAuditString()
     {
-
         StringBuilder sb = new StringBuilder();
         sb.append("BATCH of [");
         sb.append(queryOrIdList.size());

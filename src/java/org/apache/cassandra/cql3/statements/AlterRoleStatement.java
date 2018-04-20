@@ -110,6 +110,7 @@ public class AlterRoleStatement extends AuthenticationStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
+
     @Override
     public AuditLogContext getAuditLogContext()
     {

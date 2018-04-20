@@ -16,9 +16,12 @@
  * limitations under the License.
  */
 package org.apache.cassandra.audit;
+
+import org.apache.cassandra.cql3.CQLStatement;
+
 /**
- * IAuditLogContext provides the context needed for audit logging statements.
- * CQLStatement implements this interface such that every CQL command provides the context needed for AuditLog
+ * Provides the context needed for audit logging statements.
+ * {@link CQLStatement} implements this interface such that every CQL command provides the context needed for AuditLog.
  */
 public interface IAuditLogContext
 {
@@ -34,10 +37,12 @@ public interface IAuditLogContext
         {
             this(auditLogEntryType,null,null);
         }
+
         public AuditLogContext(AuditLogEntryType auditLogEntryType, String keyspace)
         {
            this(auditLogEntryType,keyspace,null);
         }
+
         public AuditLogContext(AuditLogEntryType auditLogEntryType, String keyspace, String scope)
         {
             this.auditLogEntryType = auditLogEntryType;

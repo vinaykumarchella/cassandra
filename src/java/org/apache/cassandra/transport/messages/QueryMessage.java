@@ -136,7 +136,7 @@ public class QueryMessage extends Message.Request
         {
             if(auditLogEnabled)
             {
-                AuditLogEntry auditEntry = auditLogManager.getLogEntry(query, state, options);
+                AuditLogEntry auditEntry = AuditLogEntry.getLogEntry(query, state, options);
                 auditLogManager.log(auditEntry, e);
             }
             JVMStabilityInspector.inspectThrowable(e);

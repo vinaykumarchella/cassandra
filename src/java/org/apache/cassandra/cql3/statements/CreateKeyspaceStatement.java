@@ -147,6 +147,6 @@ public class CreateKeyspaceStatement extends SchemaAlteringStatement
     @Override
     public AuditLogContext getAuditLogContext()
     {
-        return new AuditLogContext(AuditLogEntryType.CREATE_KS, keyspace());
+        return new AuditLogContext(AuditLogEntryType.CREATE_KEYSPACE, keyspace());
     }
 }

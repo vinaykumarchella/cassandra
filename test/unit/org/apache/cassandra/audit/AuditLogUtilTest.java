@@ -24,12 +24,12 @@ import java.util.Set;
 import org.junit.Assert;
 import org.junit.Test;
 
+import static org.apache.cassandra.audit.AuditLogFilter.isFiltered;
 
 public class AuditLogUtilTest
 {
-
     @Test
-    public void isFiltered_IncludeSetOnly() throws Exception
+    public void isFiltered_IncludeSetOnly()
     {
         Set<String> includeSet = new HashSet<>();
         includeSet.add("a");
@@ -38,18 +38,15 @@ public class AuditLogUtilTest
 
         Set<String> excludeSet = new HashSet<>();
 
-
-        Assert.assertFalse(AuditLogUtil.isFiltered("a", includeSet, excludeSet));
-
-        Assert.assertFalse(AuditLogUtil.isFiltered("b", includeSet, excludeSet));
-        Assert.assertFalse(AuditLogUtil.isFiltered("c", includeSet, excludeSet));
-
-        Assert.assertTrue(AuditLogUtil.isFiltered("d", includeSet, excludeSet));
-        Assert.assertTrue(AuditLogUtil.isFiltered("e", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("a", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("b", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("c", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("d", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("e", includeSet, excludeSet));
     }
 
     @Test
-    public void isFiltered_ExcludeSetOnly() throws Exception
+    public void isFiltered_ExcludeSetOnly()
     {
         Set<String> includeSet = new HashSet<>();
 
@@ -58,18 +55,15 @@ public class AuditLogUtilTest
         excludeSet.add("b");
         excludeSet.add("c");
 
-
-        Assert.assertTrue(AuditLogUtil.isFiltered("a", includeSet, excludeSet));
-
-        Assert.assertTrue(AuditLogUtil.isFiltered("b", includeSet, excludeSet));
-        Assert.assertTrue(AuditLogUtil.isFiltered("c", includeSet, excludeSet));
-
-        Assert.assertFalse(AuditLogUtil.isFiltered("d", includeSet, excludeSet));
-        Assert.assertFalse(AuditLogUtil.isFiltered("e", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("a", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("b", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("c", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("d", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("e", includeSet, excludeSet));
     }
 
     @Test
-    public void isFiltered_MutualExclusive() throws Exception
+    public void isFiltered_MutualExclusive()
     {
         Set<String> includeSet = new HashSet<>();
         includeSet.add("a");
@@ -79,15 +73,14 @@ public class AuditLogUtilTest
         Set<String> excludeSet = new HashSet<>();
         excludeSet.add("a");
 
-        Assert.assertTrue(AuditLogUtil.isFiltered("a", includeSet, excludeSet));
-        Assert.assertFalse(AuditLogUtil.isFiltered("b", includeSet, excludeSet));
-        Assert.assertFalse(AuditLogUtil.isFiltered("c", includeSet, excludeSet));
-
-        Assert.assertTrue(AuditLogUtil.isFiltered("e", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("a", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("b", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("c", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("e", includeSet, excludeSet));
     }
 
     @Test
-    public void isFiltered_MutualInclusive() throws Exception
+    public void isFiltered_MutualInclusive()
     {
         Set<String> includeSet = new HashSet<>();
         includeSet.add("a");
@@ -97,18 +90,16 @@ public class AuditLogUtilTest
         excludeSet.add("c");
         excludeSet.add("d");
 
-        Assert.assertFalse(AuditLogUtil.isFiltered("a", includeSet, excludeSet));
-        Assert.assertFalse(AuditLogUtil.isFiltered("b", includeSet, excludeSet));
-
-        Assert.assertTrue(AuditLogUtil.isFiltered("c", includeSet, excludeSet));
-        Assert.assertTrue(AuditLogUtil.isFiltered("d", includeSet, excludeSet));
-
-        Assert.assertTrue(AuditLogUtil.isFiltered("e", includeSet, excludeSet));
-        Assert.assertTrue(AuditLogUtil.isFiltered("f", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("a", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("b", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("c", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("d", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("e", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("f", includeSet, excludeSet));
 
     }
     @Test
-    public void isFiltered_UnSpecifiedInput() throws Exception
+    public void isFiltered_UnSpecifiedInput()
     {
         Set<String> includeSet = new HashSet<>();
         includeSet.add("a");
@@ -118,17 +109,15 @@ public class AuditLogUtilTest
         Set<String> excludeSet = new HashSet<>();
         excludeSet.add("a");
 
-        Assert.assertTrue(AuditLogUtil.isFiltered("a", includeSet, excludeSet));
-
-        Assert.assertFalse(AuditLogUtil.isFiltered("b", includeSet, excludeSet));
-        Assert.assertFalse(AuditLogUtil.isFiltered("c", includeSet, excludeSet));
-
-        Assert.assertTrue(AuditLogUtil.isFiltered("d", includeSet, excludeSet));
-        Assert.assertTrue(AuditLogUtil.isFiltered("e", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("a", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("b", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("c", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("d", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("e", includeSet, excludeSet));
     }
 
     @Test
-    public void isFiltered_SpecifiedInput() throws Exception
+    public void isFiltered_SpecifiedInput()
     {
         Set<String> includeSet = new HashSet<>();
         includeSet.add("a");
@@ -138,27 +127,24 @@ public class AuditLogUtilTest
         Set<String> excludeSet = new HashSet<>();
         excludeSet.add("a");
 
-        Assert.assertTrue(AuditLogUtil.isFiltered("a", includeSet, excludeSet));
-
-        Assert.assertFalse(AuditLogUtil.isFiltered("b", includeSet, excludeSet));
-        Assert.assertFalse(AuditLogUtil.isFiltered("c", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("a", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("b", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("c", includeSet, excludeSet));
     }
 
     @Test
-    public void isFiltered_FilteredInput_EmptyInclude() throws Exception
+    public void isFiltered_FilteredInput_EmptyInclude()
     {
         Set<String> includeSet = new HashSet<>();
-
-
         Set<String> excludeSet = new HashSet<>();
         excludeSet.add("a");
 
-        Assert.assertTrue(AuditLogUtil.isFiltered("a", includeSet, excludeSet));
-        Assert.assertFalse(AuditLogUtil.isFiltered("b", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("a", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("b", includeSet, excludeSet));
     }
 
     @Test
-    public void isFiltered_FilteredInput_EmptyExclude() throws Exception
+    public void isFiltered_FilteredInput_EmptyExclude()
     {
         Set<String> includeSet = new HashSet<>();
         includeSet.add("a");
@@ -167,24 +153,19 @@ public class AuditLogUtilTest
 
         Set<String> excludeSet = new HashSet<>();
 
-        Assert.assertFalse(AuditLogUtil.isFiltered("a", includeSet, excludeSet));
-        Assert.assertFalse(AuditLogUtil.isFiltered("b", includeSet, excludeSet));
-        Assert.assertFalse(AuditLogUtil.isFiltered("c", includeSet, excludeSet));
-
-        Assert.assertTrue(AuditLogUtil.isFiltered("e", includeSet, excludeSet));
-
+        Assert.assertFalse(isFiltered("a", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("b", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("c", includeSet, excludeSet));
+        Assert.assertTrue(isFiltered("e", includeSet, excludeSet));
     }
 
     @Test
-    public void isFiltered_EmptyInputs() throws Exception
+    public void isFiltered_EmptyInputs()
     {
         Set<String> includeSet = new HashSet<>();
-
         Set<String> excludeSet = new HashSet<>();
 
-        Assert.assertFalse(AuditLogUtil.isFiltered("a", includeSet, excludeSet));
-
-        Assert.assertFalse(AuditLogUtil.isFiltered("e", includeSet, excludeSet));
-
+        Assert.assertFalse(isFiltered("a", includeSet, excludeSet));
+        Assert.assertFalse(isFiltered("e", includeSet, excludeSet));
     }
 }

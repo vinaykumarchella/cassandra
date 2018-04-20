@@ -45,6 +45,7 @@ public class GrantRoleStatement extends RoleManagementStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
+
     @Override
     public AuditLogContext getAuditLogContext()
     {

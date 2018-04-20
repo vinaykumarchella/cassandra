@@ -189,14 +189,10 @@ public final class CreateFunctionStatement extends SchemaAlteringStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
-    public FunctionName getFunctionName()
-    {
-        return functionName;
-    }
 
     @Override
     public AuditLogContext getAuditLogContext()
     {
-        return new AuditLogContext(AuditLogEntryType.CREATE_FUNC, getFunctionName().keyspace, getFunctionName().name);
+        return new AuditLogContext(AuditLogEntryType.CREATE_FUNCTION, functionName.keyspace, functionName.name);
     }
 }

@@ -33,10 +33,11 @@ public class BinAuditLogger extends FullQueryLogger implements IAuditLogger
     public BinAuditLogger()
     {
         this.configure(Paths.get(DatabaseDescriptor.getAuditLoggingOptions().audit_logs_dir),
-                                            DatabaseDescriptor.getAuditLoggingOptions().roll_cycle,
-                                            DatabaseDescriptor.getAuditLoggingOptions().block,
-                                            DatabaseDescriptor.getAuditLoggingOptions().max_queue_weight,
-                                            DatabaseDescriptor.getAuditLoggingOptions().max_log_size, false);
+                       DatabaseDescriptor.getAuditLoggingOptions().roll_cycle,
+                       DatabaseDescriptor.getAuditLoggingOptions().block,
+                       DatabaseDescriptor.getAuditLoggingOptions().max_queue_weight,
+                       DatabaseDescriptor.getAuditLoggingOptions().max_log_size,
+                       false);
     }
 
     @Override
@@ -44,14 +45,10 @@ public class BinAuditLogger extends FullQueryLogger implements IAuditLogger
     {
         if(logMessage != null)
         {
-            this.log(logMessage.toString());
+            log(logMessage.toString());
         }
     }
 
-    /**
-     * Log AuditLog message
-     * @param message Audit Log Message
-     */
     public void log(String message)
     {
         BinLog binLog = this.binLog;
@@ -83,11 +80,11 @@ public class BinAuditLogger extends FullQueryLogger implements IAuditLogger
         {
 
         }
+
         @Override
         public int weight()
         {
             return Ints.checkedCast(ObjectSizes.sizeOf(message));
         }
     }
-
 }

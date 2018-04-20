@@ -334,6 +334,7 @@ public class UpdateStatement extends ModificationStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
+
     @Override
     public AuditLogContext getAuditLogContext()
     {

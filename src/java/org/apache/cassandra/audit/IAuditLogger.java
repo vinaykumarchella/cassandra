@@ -18,10 +18,6 @@
 
 package org.apache.cassandra.audit;
 
-/**
- * Implementaters can decide to put async, sync log writer implementations
- *
- */
 public abstract interface IAuditLogger
 {
     public abstract void log(AuditLogEntry logMessage);

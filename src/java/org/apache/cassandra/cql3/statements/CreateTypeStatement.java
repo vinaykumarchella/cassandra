@@ -141,10 +141,6 @@ public class CreateTypeStatement extends SchemaAlteringStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
-    public String getStringTypeName()
-    {
-        return name.getStringTypeName();
-    }
 
     @Override
     public AuditLogContext getAuditLogContext()

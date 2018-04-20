@@ -20,13 +20,10 @@ package org.apache.cassandra.audit;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,20 +40,25 @@ import org.apache.cassandra.utils.FBUtilities;
 
 public class AuditLogManager
 {
-    static final Logger logger = LoggerFactory.getLogger(AuditLogManager.class);
+    private static final Logger logger = LoggerFactory.getLogger(AuditLogManager.class);
     private static final AuditLogManager instance = new AuditLogManager();
+
     private IAuditLogger auditLogger;
+    private volatile AuditLogFilter filter;
+
     private AuditLogManager()
     {
         if (isAuditingEnabled())
         {
-            logger.info("Audit logging is enabled.");
+            logger.debug("Audit logging is enabled.");
             this.auditLogger = getAuditLogger();
         }
         else
         {
-            logger.info("Audit logging is disabled.");
+            logger.debug("Audit logging is disabled.");
         }
+
+        filter = AuditLogFilter.create();
     }
 
     public static AuditLogManager getInstance()
@@ -64,14 +66,14 @@ public class AuditLogManager
         return instance;
     }
 
-
     private IAuditLogger getAuditLogger()
     {
         String loggerClassName = DatabaseDescriptor.getAuditLoggingOptions().logger;
-        if(loggerClassName !=null)
+        if (loggerClassName != null)
         {
             return FBUtilities.newAuditLogger(loggerClassName);
         }
+
         return FBUtilities.newAuditLogger(BinAuditLogger.class.getName());
     }
 
@@ -85,11 +87,13 @@ public class AuditLogManager
     {
         return DatabaseDescriptor.getAuditLoggingOptions().enabled;
     }
+
     public boolean isLoggingEnabled()
     {
-        return isAuditingEnabled() || FullQueryLogger.instance.enabled();
+        return isAuditingEnabled() || isFQLEnabled();
     }
-    public boolean isFQLEnabled()
+
+    private boolean isFQLEnabled()
     {
         return FullQueryLogger.instance.enabled();
     }
@@ -99,7 +103,7 @@ public class AuditLogManager
         return SchemaConstants.isLocalSystemKeyspace(keyspaceName);
     }
 
-    /**
+    /*
      * Logging overloads
      */
     public void log(AuditLogEntry logEntry)
@@ -107,9 +111,9 @@ public class AuditLogManager
         if (isAuditingEnabled()
             && (null != logEntry)
             && ((null == logEntry.getKeyspace()) || !isSystemKeyspace(logEntry.getKeyspace()))
-            && (!AuditLogFilter.getInstance().isFiltered(logEntry)))
+            && (!filter.isFiltered(logEntry)))
         {
-            this.auditLogger.log(logEntry);
+            auditLogger.log(logEntry);
         }
     }
 
@@ -117,13 +121,13 @@ public class AuditLogManager
     {
         for (AuditLogEntry auditLogEntry : auditLogEntries)
         {
-            this.log(auditLogEntry);
+            log(auditLogEntry);
         }
     }
 
     public void log(AuditLogEntry logEntry, Exception e)
     {
-        if ((logEntry != null) && (this.isAuditingEnabled()))
+        if ((logEntry != null) && (isAuditingEnabled()))
         {
             AuditLogEntry auditEntry = new AuditLogEntry(logEntry);
 
@@ -141,13 +145,13 @@ public class AuditLogManager
             }
             auditEntry.appendToOperation(e.getMessage());
 
-            this.log(auditEntry);
+            log(auditEntry);
         }
     }
 
     public void log(List<AuditLogEntry> auditLogEntries, Exception e)
     {
-        if(null != auditLogEntries)
+        if (null != auditLogEntries)
         {
             for (AuditLogEntry logEntry : auditLogEntries)
             {
@@ -155,7 +159,6 @@ public class AuditLogManager
             }
         }
     }
-
 
     public void log(CQLStatement statement, String query, QueryOptions options, QueryState state, long queryStartNanoTime)
     {
@@ -165,9 +168,10 @@ public class AuditLogManager
          */
         if(isAuditingEnabled())
         {
-            AuditLogEntry auditEntry = this.getLogEntry(statement, query, state, options);
+            AuditLogEntry auditEntry = AuditLogEntry.getLogEntry(statement, query, state, options);
             this.log(auditEntry);
         }
+
         if(isFQLEnabled())
         {
             long fqlTime =  System.currentTimeMillis()-TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-queryStartNanoTime);
@@ -175,13 +179,13 @@ public class AuditLogManager
         }
     }
 
-
     public void logBatch(String batchTypeName, List<Object> queryOrIdList, List<List<ByteBuffer>> values, List<ParsedStatement.Prepared> prepared, QueryOptions options, QueryState state, long queryStartNanoTime)
     {
         if(isAuditingEnabled())
         {
-            this.log(this.getLogEntriesForBatch(queryOrIdList, prepared, state, options));
+            log(AuditLogEntry.getLogEntriesForBatch(queryOrIdList, prepared, state, options));
         }
+
         if(isFQLEnabled())
         {
             List<String> queryStrings = new ArrayList<>(queryOrIdList.size());
@@ -193,131 +197,8 @@ public class AuditLogManager
         }
     }
 
-    /**
-     * Native protocol/ CQL helper methods for Audit Logging
-     */
-
-    public AuditLogEntry getLogEntry(CQLStatement statement, String queryString, QueryState queryState, AuditLogEntryType type)
+    public void reloadFilters()
     {
-        AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
-
-        entry.setKeyspace(getKeyspace(statement, queryState))
-             .setScope(getColumnFamily(statement))
-             .setOperation(queryString)
-             .setType(type);
-
-        return entry;
+        filter = AuditLogFilter.create();
     }
-
-    /**
-     * Gets the AuditLogEntry entry as per the params given. Ensure that type is set by the caller.
-     *
-     * @param operation
-     * @param queryState
-     * @return
-     */
-    public AuditLogEntry getLogEntry(String operation, QueryState queryState, AuditLogEntryType type)
-    {
-
-        AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
-
-        entry.setKeyspace(queryState.getClientState().getRawKeyspace())
-             .setOperation(operation)
-             .setType(type);
-
-        return entry;
-    }
-
-
-    /**
-     * Native protocol/ CQL helper methods for Audit Logging
-     */
-
-    public AuditLogEntry getLogEntry(CQLStatement statement, String queryString, QueryState queryState)
-    {
-        return this.getLogEntry(statement, queryString, queryState, statement.getAuditLogContext().auditLogEntryType);
-    }
-
-    public AuditLogEntry getLogEntry(CQLStatement statement, String queryString, QueryState queryState, QueryOptions queryOptions)
-    {
-
-        return this.getLogEntry(statement, queryString, queryState);
-    }
-
-    /**
-     * Gets the AuditLogEntry entry as per the params given. Ensure that type is set by the caller.
-     *
-     * @param queryString
-     * @param queryState
-     * @param queryOptions
-     * @return
-     */
-    public AuditLogEntry getLogEntry(String queryString, QueryState queryState, QueryOptions queryOptions)
-    {
-
-        AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
-
-        entry.setKeyspace(queryState.getClientState().getRawKeyspace())
-             .setOperation(queryString);
-
-        return entry;
-    }
-
-    /**
-     * Gets the AuditLogEntry entry as per the params given. Ensure that type is set by the caller.
-     *
-     * @param queryString
-     * @param queryState
-     * @param queryOptions
-     * @param batchId
-     * @return
-     */
-    public AuditLogEntry getLogEntry(String queryString, QueryState queryState, QueryOptions queryOptions, UUID batchId)
-    {
-        AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
-
-        entry.setKeyspace(queryState.getClientState().getRawKeyspace())
-             .setBatch(batchId)
-             .setType(AuditLogEntryType.BATCH)
-             .setOperation(queryString);
-        return entry;
-    }
-
-    private AuditLogEntry getLogEntry(CQLStatement statement, String rawCQLStatement, QueryState queryState, QueryOptions queryOptions, UUID batchId)
-    {
-        return this.getLogEntry(statement, rawCQLStatement, queryState, queryOptions).setBatch(batchId);
-    }
-
-    public List<AuditLogEntry> getLogEntriesForBatch(List<Object> queryOrIdList, List<ParsedStatement.Prepared> prepared, QueryState state, QueryOptions options)
-    {
-        List<AuditLogEntry> auditLogEntries = Lists.newArrayList();
-
-        UUID batchId = UUID.randomUUID();
-
-        String queryString = String.format("BatchId:[%s] - BATCH of [%d] statements", batchId, queryOrIdList.size());
-
-        auditLogEntries.add(this.getLogEntry(queryString, state, options, batchId));
-
-        for (int i = 0; i < queryOrIdList.size(); i++)
-        {
-           auditLogEntries.add(this.getLogEntry(prepared.get(i).statement, prepared.get(i).rawCQLStatement, state, options, batchId));
-        }
-
-        return auditLogEntries;
-    }
-
-    /**
-     * HELPER methods for Audit Logging
-     */
-
-    private String getKeyspace(CQLStatement stmt, QueryState queryState)
-    {
-        return stmt.getAuditLogContext().keyspace!=null ? stmt.getAuditLogContext().keyspace : queryState.getClientState().getRawKeyspace();
-    }
-
-    public static String getColumnFamily(CQLStatement stmt)
-    {
-        return stmt.getAuditLogContext().scope;
-    }
-
 }

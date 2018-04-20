@@ -79,9 +79,10 @@ public class DropKeyspaceStatement extends SchemaAlteringStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
+
     @Override
     public AuditLogContext getAuditLogContext()
     {
-        return new AuditLogContext(AuditLogEntryType.DROP_KS, keyspace());
+        return new AuditLogContext(AuditLogEntryType.DROP_KEYSPACE, keyspace());
     }
 }

@@ -74,9 +74,10 @@ public class UseStatement extends ParsedStatement implements CQLStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
+
     @Override
     public AuditLogContext getAuditLogContext()
     {
-        return new AuditLogContext(AuditLogEntryType.USE_KS, keyspace);
+        return new AuditLogContext(AuditLogEntryType.USE_KEYSPACE, keyspace);
     }
 }

@@ -18,17 +18,24 @@
 package org.apache.cassandra.audit;
 
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.UUID;
 
+import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 
 import org.apache.cassandra.auth.AuthenticatedUser;
+import org.apache.cassandra.cql3.CQLStatement;
+import org.apache.cassandra.cql3.QueryOptions;
+import org.apache.cassandra.cql3.statements.ParsedStatement;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.service.ClientState;
+import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.utils.FBUtilities;
 
 public class AuditLogEntry
 {
+    private static final InetSocketAddress DEFAULT_SOURCE = new InetSocketAddress("0.0.0.0", 0);
 
     private final InetAddressAndPort host = FBUtilities.getBroadcastAddressAndPort();
     private final String source, user;
@@ -43,7 +50,7 @@ public class AuditLogEntry
         this.source = source;
         this.user = user;
         this.srcPort = srcPort;
-        this.timestamp = System.currentTimeMillis();
+        timestamp = System.currentTimeMillis();
     }
 
     public AuditLogEntry(AuditLogEntryType type, String user, String source, int srcPort)
@@ -55,11 +62,11 @@ public class AuditLogEntry
     public AuditLogEntry(AuditLogEntry auditLogEntry)
     {
         this(auditLogEntry.type, auditLogEntry.user, auditLogEntry.source, auditLogEntry.srcPort);
-        this.timestamp = auditLogEntry.timestamp;
-        this.keyspace = auditLogEntry.keyspace;
-        this.scope = auditLogEntry.scope;
-        this.batch = auditLogEntry.batch;
-        this.operation = auditLogEntry.operation;
+        timestamp = auditLogEntry.timestamp;
+        keyspace = auditLogEntry.keyspace;
+        scope = auditLogEntry.scope;
+        batch = auditLogEntry.batch;
+        operation = auditLogEntry.operation;
     }
 
     public static AuditLogEntry getAuditEntry(ClientState clientState)
@@ -75,33 +82,34 @@ public class AuditLogEntry
 
     public String toString()
     {
-        StringBuilder builder = new StringBuilder();
-        builder.append("user:").append(this.user)
-               .append("|host:").append(this.host)
-               .append("|source:").append(this.source);
+        StringBuilder builder = new StringBuilder(64);
+        builder.append("user:").append(user)
+               .append("|host:").append(host)
+               .append("|source:").append(source);
         if (srcPort > 0)
         {
-            builder.append("|port:").append(this.srcPort);
+            builder.append("|port:").append(srcPort);
         }
-        builder.append("|timestamp:").append(this.timestamp)
-               .append("|type:").append(this.type)
-               .append("|category:").append(this.type.getCategory());
 
-        if (this.batch != null)
+        builder.append("|timestamp:").append(timestamp)
+               .append("|type:").append(type)
+               .append("|category:").append(type.getCategory());
+
+        if (batch != null)
         {
-            builder.append("|batch:").append(this.batch);
+            builder.append("|batch:").append(batch);
         }
-        if (this.keyspace != null && this.keyspace.length() > 0)
+        if (StringUtils.isNotBlank(keyspace))
         {
-            builder.append("|ks:").append(this.keyspace);
+            builder.append("|ks:").append(keyspace);
         }
-        if (this.scope != null && this.scope.length() > 0)
+        if (StringUtils.isNotBlank(scope))
         {
-            builder.append("|scope:").append(this.scope);
+            builder.append("|scope:").append(scope);
         }
-        if (this.operation != null && StringUtils.isNotBlank(this.operation))
+        if (StringUtils.isNotBlank(operation))
         {
-            builder.append("|operation:").append(this.operation);
+            builder.append("|operation:").append(operation);
         }
         return builder.toString();
     }
@@ -175,12 +183,105 @@ public class AuditLogEntry
             this.operation = this.operation.concat("; ").concat(str);
         }
     }
+
     private static InetSocketAddress getSource(ClientState state)
     {
         if (state!=null && state.getRemoteAddress() != null)
         {
             return state.getRemoteAddress();
         }
-        return AuditLogUtil.DEFAULT_SOURCE;
+        return DEFAULT_SOURCE;
+    }
+
+    public static AuditLogEntry getLogEntry(CQLStatement statement, String queryString, QueryState queryState, AuditLogEntryType type)
+    {
+        AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
+
+        entry.setKeyspace(getKeyspace(statement, queryState))
+             .setScope(getColumnFamily(statement))
+             .setOperation(queryString)
+             .setType(type);
+
+        return entry;
+    }
+
+    /**
+     * Gets the AuditLogEntry entry as per the params given. Ensure that type is set by the caller.
+     */
+    public static AuditLogEntry getLogEntry(String operation, QueryState queryState, AuditLogEntryType type)
+    {
+        AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
+        entry.setKeyspace(queryState.getClientState().getRawKeyspace())
+             .setOperation(operation)
+             .setType(type);
+
+        return entry;
+    }
+
+    /**
+     * Native protocol/ CQL helper methods for Audit Logging
+     */
+    public static AuditLogEntry getLogEntry(CQLStatement statement, String queryString, QueryState queryState)
+    {
+        return getLogEntry(statement, queryString, queryState, statement.getAuditLogContext().auditLogEntryType);
+    }
+
+    public static AuditLogEntry getLogEntry(CQLStatement statement, String queryString, QueryState queryState, QueryOptions queryOptions)
+    {
+        return getLogEntry(statement, queryString, queryState);
+    }
+
+    /**
+     * Gets the AuditLogEntry entry as per the params given. Ensure that type is set by the caller.
+     */
+    public static AuditLogEntry getLogEntry(String queryString, QueryState queryState, QueryOptions queryOptions)
+    {
+        AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
+        entry.setKeyspace(queryState.getClientState().getRawKeyspace()).setOperation(queryString);
+        return entry;
+    }
+
+    /**
+     * Gets the AuditLogEntry entry as per the params given. Ensure that type is set by the caller.
+     */
+    public static AuditLogEntry getLogEntry(String queryString, QueryState queryState, QueryOptions queryOptions, UUID batchId)
+    {
+        AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
+
+        entry.setKeyspace(queryState.getClientState().getRawKeyspace())
+             .setBatch(batchId)
+             .setType(AuditLogEntryType.BATCH)
+             .setOperation(queryString);
+        return entry;
+    }
+
+    private static AuditLogEntry getLogEntry(CQLStatement statement, String rawCQLStatement, QueryState queryState, QueryOptions queryOptions, UUID batchId)
+    {
+        return getLogEntry(statement, rawCQLStatement, queryState, queryOptions).setBatch(batchId);
+    }
+
+    public static List<AuditLogEntry> getLogEntriesForBatch(List<Object> queryOrIdList, List<ParsedStatement.Prepared> prepared, QueryState state, QueryOptions options)
+    {
+        List<AuditLogEntry> auditLogEntries = Lists.newArrayList();
+        UUID batchId = UUID.randomUUID();
+        String queryString = String.format("BatchId:[%s] - BATCH of [%d] statements", batchId, queryOrIdList.size());
+        auditLogEntries.add(getLogEntry(queryString, state, options, batchId));
+
+        for (int i = 0; i < queryOrIdList.size(); i++)
+        {
+            auditLogEntries.add(getLogEntry(prepared.get(i).statement, prepared.get(i).rawCQLStatement, state, options, batchId));
+        }
+
+        return auditLogEntries;
+    }
+
+    private static String getKeyspace(CQLStatement stmt, QueryState queryState)
+    {
+        return stmt.getAuditLogContext().keyspace != null ? stmt.getAuditLogContext().keyspace : queryState.getClientState().getRawKeyspace();
+    }
+
+    private static String getColumnFamily(CQLStatement stmt)
+    {
+        return stmt.getAuditLogContext().scope;
     }
 }

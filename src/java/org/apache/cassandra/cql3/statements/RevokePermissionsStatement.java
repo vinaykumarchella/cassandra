@@ -49,9 +49,11 @@ public class RevokePermissionsStatement extends PermissionsManagementStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
+
     @Override
     public AuditLogContext getAuditLogContext()
     {
-        return new AuditLogContext(AuditLogEntryType.REVOKE, resource.hasParent()?resource.getParent().getName():resource.getName(), resource.getName());
+        String keyspace = resource.hasParent() ? resource.getParent().getName() : resource.getName();
+        return new AuditLogContext(AuditLogEntryType.REVOKE, keyspace, resource.getName());
     }
 }

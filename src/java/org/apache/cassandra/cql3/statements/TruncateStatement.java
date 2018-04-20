@@ -97,6 +97,7 @@ public class TruncateStatement extends CFStatement implements CQLStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
+
     @Override
     public AuditLogContext getAuditLogContext()
     {

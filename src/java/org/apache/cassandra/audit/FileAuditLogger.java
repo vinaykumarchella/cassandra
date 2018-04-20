@@ -22,8 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Synchronous file based audit logger
- *
+ * Synchronous, file-based audit logger; just uses the standard logging mechansim.
  */
 public class FileAuditLogger implements IAuditLogger
 {
@@ -34,5 +33,4 @@ public class FileAuditLogger implements IAuditLogger
     {
         logger.info(logMessage.toString());
     }
-
 }

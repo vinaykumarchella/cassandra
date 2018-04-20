@@ -20,7 +20,7 @@ package org.apache.cassandra.audit;
 
 public enum AuditLogEntryType
 {
-    /**
+    /*
      * CQL Audit Log Entry Types
      */
 
@@ -28,9 +28,9 @@ public enum AuditLogEntryType
     UPDATE("DML"),
     DELETE("DML"),
     TRUNCATE("DDL"),
-    CREATE_KS("DDL"),
-    ALTER_KS("DDL"),
-    DROP_KS("DDL"),
+    CREATE_KEYSPACE("DDL"),
+    ALTER_KEYSPACE("DDL"),
+    DROP_KEYSPACE("DDL"),
     CREATE_TABLE("DDL"),
     DROP_TABLE("DDL"),
     PREPARE_STATEMENT("DML"),
@@ -41,35 +41,35 @@ public enum AuditLogEntryType
     GRANT("DCL"),
     REVOKE("DCL"),
     CREATE_TYPE("DDL"),
-    DROP_AGG("DDL"),
+    DROP_AGGREGATE("DDL"),
     ALTER_VIEW("DDL"),
     CREATE_VIEW("DDL"),
     DROP_ROLE("DCL"),
-    CREATE_FUNC("DDL"),
+    CREATE_FUNCTION("DDL"),
     ALTER_TABLE("DDL"),
     BATCH("DML"),
-    CREATE_AGG("DDL"),
+    CREATE_AGGREGATE("DDL"),
     AUTH("AUTH"),
     DROP_VIEW("DDL"),
     DROP_TYPE("DDL"),
-    DROP_FUNC("DDL"),
+    DROP_FUNCTION("DDL"),
     ALTER_ROLE("DCL"),
     CREATE_TRIGGER("DDL"),
     LIST_ROLES("DCL"),
     LIST_PERMISSIONS("DCL"),
     ALTER_TYPE("DDL"),
     CREATE_ROLE("DCL"),
-    USE_KS("OTHER"),
+    USE_KEYSPACE("OTHER"),
 
 
-    /**
+    /*
      * Common Audit Log Entry Types
      */
 
-    REQUEST_FAILURE("Other"),
+    REQUEST_FAILURE("OTHER"),
     LOGIN_ERROR("AUTH"),
     UNAUTHORIZED_ATTEMPT("AUTH"),
-    UNKNOWN("Other"),
+    UNKNOWN("OTHER"),
     LOGIN_SUCCESS("AUTH");
 
 
@@ -83,5 +83,4 @@ public enum AuditLogEntryType
     {
         return this.category;
     }
-
 }

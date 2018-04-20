@@ -30,39 +30,34 @@ public class AuditLogFilter
 {
     private static final Logger logger = LoggerFactory.getLogger(AuditLogFilter.class);
 
-    private volatile ImmutableSet<String> excludedKeyspaces = ImmutableSet.of();
-    private volatile ImmutableSet<String> includedKeyspaces = ImmutableSet.of();
+    private final ImmutableSet<String> excludedKeyspaces;
+    private final ImmutableSet<String> includedKeyspaces;
+    private final ImmutableSet<String> excludedCategories;
+    private final ImmutableSet<String> includedCategories;
+    private final ImmutableSet<String> includedUsers;
+    private final ImmutableSet<String> excludedUsers;
 
-    private volatile ImmutableSet<String> excludedCategories = ImmutableSet.of();
-    private volatile ImmutableSet<String> includedCategories = ImmutableSet.of();
-
-    private volatile ImmutableSet<String> includedUsers = ImmutableSet.of();
-    private volatile ImmutableSet<String> excludedUsers = ImmutableSet.of();
-
-    private static final AuditLogFilter instance = new AuditLogFilter();
-
-    private AuditLogFilter()
+    private AuditLogFilter(ImmutableSet<String> excludedKeyspaces, ImmutableSet<String> includedKeyspaces, ImmutableSet<String> excludedCategories, ImmutableSet<String> includedCategories, ImmutableSet<String> includedUsers, ImmutableSet<String> excludedUsers)
     {
-        loadFilters();
-    }
-
-    public static AuditLogFilter getInstance()
-    {
-        return instance;
+        this.excludedKeyspaces = excludedKeyspaces;
+        this.includedKeyspaces = includedKeyspaces;
+        this.excludedCategories = excludedCategories;
+        this.includedCategories = includedCategories;
+        this.includedUsers = includedUsers;
+        this.excludedUsers = excludedUsers;
     }
 
     /**
-     * (Re)Loads filters from config. This is being called during startup as well as JMX filter reload
+     * (Re-)Loads filters from config. Called during startup as well as JMX filter reload.
      */
-    public final void loadFilters()
+    public static AuditLogFilter create()
     {
-        logger.info("Loading AuditLog filters");
+        logger.trace("Loading AuditLog filters");
         Set<String> includedKeyspacesSet = new HashSet<>();
         Set<String> excludedKeyspacesSet = new HashSet<>();
 
         Set<String> excludedCategoriesSet = new HashSet<>();
         Set<String> includedCategoriesSet = new HashSet<>();
-
 
         Set<String> excludedUsersSet = new HashSet<>();
         Set<String> includedUsersSet = new HashSet<>();
@@ -77,34 +72,31 @@ public class AuditLogFilter
                       excludedUsersSet, DatabaseDescriptor.getAuditLoggingOptions().excluded_users);
 
 
-        includedKeyspaces = ImmutableSet.copyOf(includedKeyspacesSet);
-        excludedKeyspaces = ImmutableSet.copyOf(excludedKeyspacesSet);
-
-        includedCategories = ImmutableSet.copyOf(includedCategoriesSet);
-        excludedCategories = ImmutableSet.copyOf(excludedCategoriesSet);
-
-        includedUsers = ImmutableSet.copyOf(includedUsersSet);
-        excludedUsers = ImmutableSet.copyOf(excludedUsersSet);
+        return new AuditLogFilter(ImmutableSet.copyOf(includedKeyspacesSet), ImmutableSet.copyOf(excludedKeyspacesSet),
+                                  ImmutableSet.copyOf(includedCategoriesSet), ImmutableSet.copyOf(excludedCategoriesSet),
+                                  ImmutableSet.copyOf(includedUsersSet), ImmutableSet.copyOf(excludedUsersSet));
     }
 
     /**
-     * Constructs mutually exclusive sets with excluded set being the default option when there are conlicting inputs
+     * Constructs mutually exclusive sets of included and excluded data. When there is a conflict,
+     * the entry is put into the excluded set (and removed fron the included).
      */
-    private void loadInputSets(Set<String> includedSet, String includedInput, Set<String> excludedSet, String excludedInput)
+    private static void loadInputSets(Set<String> includedSet, String includedInput, Set<String> excludedSet, String excludedInput)
     {
-        for (String keyspace : excludedInput.split(","))
+        for (String exclude : excludedInput.split(","))
         {
-            if (!keyspace.isEmpty())
+            if (!exclude.isEmpty())
             {
-                excludedSet.add(keyspace);
+                excludedSet.add(exclude);
             }
         }
-        for (String keyspace : includedInput.split(","))
+
+        for (String include : includedInput.split(","))
         {
             //Ensure both included and excluded sets are mutually exclusive
-            if (!keyspace.isEmpty() && !excludedSet.contains(keyspace))
+            if (!include.isEmpty() && !excludedSet.contains(include))
             {
-                includedSet.add(keyspace);
+                includedSet.add(include);
             }
         }
     }
@@ -117,9 +109,28 @@ public class AuditLogFilter
      */
     boolean isFiltered(AuditLogEntry auditLogEntry)
     {
-        return AuditLogUtil.isFiltered(auditLogEntry.getKeyspace(), includedKeyspaces, excludedKeyspaces)
-               || AuditLogUtil.isFiltered(auditLogEntry.getType().getCategory(), includedCategories, excludedCategories)
-               || AuditLogUtil.isFiltered(auditLogEntry.getUser(), includedUsers, excludedUsers);
+        return isFiltered(auditLogEntry.getKeyspace(), includedKeyspaces, excludedKeyspaces)
+               || isFiltered(auditLogEntry.getType().getCategory(), includedCategories, excludedCategories)
+               || isFiltered(auditLogEntry.getUser(), includedUsers, excludedUsers);
     }
 
+    /**
+     * Checks whether given input is being filtered or not.
+     * If excludeSet does not contain any items, by default nothing is excluded (unless there are
+     * entries in the includeSet).
+     * If includeSet does not contain any items, by default everything is included
+     * If an input is part of both includeSet and excludeSet, excludeSet takes the priority over includeSet
+     *
+     * @param input      Input to be checked for filtereing based on includeSet and excludeSet
+     * @param includeSet Include filtering set
+     * @param excludeSet Exclude filtering set
+     * @return true if the input is filtered, false when the input is not filtered
+     */
+    static boolean isFiltered(String input, Set<String> includeSet, Set<String> excludeSet)
+    {
+        if (!excludeSet.isEmpty() && excludeSet.contains(input))
+            return true;
+
+        return !(includeSet.isEmpty() || includeSet.contains(input));
+    }
 }

@@ -120,7 +120,7 @@ public class PrepareMessage extends Message.Request
             if(auditLogEnabled)
             {
                 ParsedStatement.Prepared parsedStmt = QueryProcessor.parseStatement(query, state.getClientState());
-                AuditLogEntry auditEntry = auditLogManager.getLogEntry(parsedStmt.statement, query, state, AuditLogEntryType.PREPARE_STATEMENT);
+                AuditLogEntry auditEntry = AuditLogEntry.getLogEntry(parsedStmt.statement, query, state, AuditLogEntryType.PREPARE_STATEMENT);
                 auditLogManager.log(auditEntry);
             }
 
@@ -133,7 +133,7 @@ public class PrepareMessage extends Message.Request
         {
             if(auditLogEnabled)
             {
-                AuditLogEntry auditEntry = auditLogManager
+                AuditLogEntry auditEntry = AuditLogEntry
                                            .getLogEntry(query, state, AuditLogEntryType.PREPARE_STATEMENT)
                                            .setKeyspace(keyspace);
                 auditLogManager.log(auditEntry, e);

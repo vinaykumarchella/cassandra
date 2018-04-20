@@ -45,7 +45,8 @@ public class GrantPermissionsStatement extends PermissionsManagementStatement
     @Override
     public AuditLogContext getAuditLogContext()
     {
-        return new AuditLogContext(AuditLogEntryType.GRANT, resource.hasParent() ? resource.getParent().getName() : resource.getName(), resource.getName());
+        String keyspace = resource.hasParent() ? resource.getParent().getName() : resource.getName();
+        return new AuditLogContext(AuditLogEntryType.GRANT, keyspace, resource.getName());
     }
 
 }

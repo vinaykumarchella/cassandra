@@ -212,13 +212,13 @@ public class ExecuteMessage extends Message.Request
             {
                 if (e instanceof PreparedQueryNotFoundException)
                 {
-                    AuditLogEntry auditLogEntry = auditLogManager.getLogEntry(toString(), state, this.options);
+                    AuditLogEntry auditLogEntry = AuditLogEntry.getLogEntry(toString(), state, this.options);
                     auditLogManager.log(auditLogEntry, e);
                 }
                 else
                 {
                     ParsedStatement.Prepared prepared = ClientState.getCQLQueryHandler().getPrepared(statementId);
-                    AuditLogEntry auditLogEntry = auditLogManager.getLogEntry(prepared.statement, prepared.rawCQLStatement, state, options);
+                    AuditLogEntry auditLogEntry = AuditLogEntry.getLogEntry(prepared.statement, prepared.rawCQLStatement, state, options);
                     auditLogManager.log(auditLogEntry, e);
                 }
             }

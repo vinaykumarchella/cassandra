@@ -75,8 +75,8 @@ public class FullQueryLogger
     }
 
     protected static final Logger logger = LoggerFactory.getLogger(FullQueryLogger.class);
-    protected static final NoSpamLogger noSpamLogger = NoSpamLogger.getLogger(logger, 1, TimeUnit.MINUTES);
-    protected static final NoSpamLogger.NoSpamLogStatement droppedSamplesStatement = noSpamLogger.getStatement("Dropped {} binary log samples", 1, TimeUnit.MINUTES);
+    private static final NoSpamLogger noSpamLogger = NoSpamLogger.getLogger(logger, 1, TimeUnit.MINUTES);
+    private static final NoSpamLogger.NoSpamLogStatement droppedSamplesStatement = noSpamLogger.getStatement("Dropped {} binary log samples", 1, TimeUnit.MINUTES);
 
     public static final FullQueryLogger instance = new FullQueryLogger();
 
@@ -84,7 +84,7 @@ public class FullQueryLogger
     protected volatile boolean blocking;
     protected Path path;
 
-    protected final AtomicLong droppedSamplesSinceLastLog = new AtomicLong();
+    private final AtomicLong droppedSamplesSinceLastLog = new AtomicLong();
 
     protected FullQueryLogger()
     {
@@ -126,11 +126,13 @@ public class FullQueryLogger
         Preconditions.checkArgument(maxQueueWeight > 0, "maxQueueWeight must be > 0");
         Preconditions.checkArgument(maxLogSize > 0, "maxLogSize must be > 0");
         logger.info("Attempting to configure full query logger path: {} Roll cycle: {} Blocking: {} Max queue weight: {} Max log size:{}", path, rollCycle, blocking, maxQueueWeight, maxLogSize);
+
         if (binLog != null)
         {
             logger.warn("Full query logger already configured. Ignoring requested configuration.");
             throw new IllegalStateException("Already configured");
         }
+
         if(cleanDirectory)
         {
             logger.info("Cleaning directory: {} as requested",path);

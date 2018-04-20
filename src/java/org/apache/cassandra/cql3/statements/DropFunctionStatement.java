@@ -194,14 +194,10 @@ public final class DropFunctionStatement extends SchemaAlteringStatement
     {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
-    public FunctionName getFunctionName()
-    {
-        return functionName;
-    }
 
     @Override
     public AuditLogContext getAuditLogContext()
     {
-        return new AuditLogContext(AuditLogEntryType.DROP_FUNC, getFunctionName().keyspace, getFunctionName().name);
+        return new AuditLogContext(AuditLogEntryType.DROP_FUNCTION, functionName.keyspace, functionName.name);
     }
 }
