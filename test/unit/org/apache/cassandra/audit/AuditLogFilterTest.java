@@ -26,7 +26,7 @@ import org.junit.Test;
 
 import static org.apache.cassandra.audit.AuditLogFilter.isFiltered;
 
-public class AuditLogUtilTest
+public class AuditLogFilterTest
 {
     @Test
     public void isFiltered_IncludeSetOnly()

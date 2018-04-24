@@ -37,7 +37,7 @@ public class AuditLogFilter
     private final ImmutableSet<String> includedUsers;
     private final ImmutableSet<String> excludedUsers;
 
-    private AuditLogFilter(ImmutableSet<String> excludedKeyspaces, ImmutableSet<String> includedKeyspaces, ImmutableSet<String> excludedCategories, ImmutableSet<String> includedCategories, ImmutableSet<String> includedUsers, ImmutableSet<String> excludedUsers)
+    private AuditLogFilter(ImmutableSet<String> excludedKeyspaces, ImmutableSet<String> includedKeyspaces, ImmutableSet<String> excludedCategories, ImmutableSet<String> includedCategories, ImmutableSet<String> excludedUsers, ImmutableSet<String> includedUsers)
     {
         this.excludedKeyspaces = excludedKeyspaces;
         this.includedKeyspaces = includedKeyspaces;
@@ -72,9 +72,9 @@ public class AuditLogFilter
                       excludedUsersSet, DatabaseDescriptor.getAuditLoggingOptions().excluded_users);
 
 
-        return new AuditLogFilter(ImmutableSet.copyOf(includedKeyspacesSet), ImmutableSet.copyOf(excludedKeyspacesSet),
-                                  ImmutableSet.copyOf(includedCategoriesSet), ImmutableSet.copyOf(excludedCategoriesSet),
-                                  ImmutableSet.copyOf(includedUsersSet), ImmutableSet.copyOf(excludedUsersSet));
+        return new AuditLogFilter(ImmutableSet.copyOf(excludedKeyspacesSet), ImmutableSet.copyOf(includedKeyspacesSet),
+                                  ImmutableSet.copyOf(excludedCategoriesSet), ImmutableSet.copyOf(includedCategoriesSet),
+                                  ImmutableSet.copyOf(excludedUsersSet), ImmutableSet.copyOf(includedUsersSet));
     }
 
     /**
