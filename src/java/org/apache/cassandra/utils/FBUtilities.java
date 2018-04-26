@@ -535,6 +535,22 @@ public class FBUtilities
         return FBUtilities.construct(className, "Audit logger");
     }
 
+    public static boolean isAuditLoggerClassExists(String className)
+    {
+        if (!className.contains("."))
+            className = "org.apache.cassandra.audit." + className;
+
+        try
+        {
+            FBUtilities.classForName(className, "Audit logger");
+        }
+        catch (ConfigurationException e)
+        {
+            return false;
+        }
+        return true;
+    }
+
     /**
      * @return The Class for the given name.
      * @param classname Fully qualified classname.

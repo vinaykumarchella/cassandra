@@ -33,6 +33,7 @@ import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.statements.ParsedStatement;
 import org.apache.cassandra.db.fullquerylog.FullQueryLogger;
 import org.apache.cassandra.exceptions.AuthenticationException;
+import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.exceptions.UnauthorizedException;
 import org.apache.cassandra.schema.SchemaConstants;
 import org.apache.cassandra.service.QueryState;
@@ -45,20 +46,20 @@ public class AuditLogManager
 
     private IAuditLogger auditLogger;
     private volatile AuditLogFilter filter;
-
     private AuditLogManager()
     {
-        if (isAuditingEnabled())
+        if (DatabaseDescriptor.getAuditLoggingOptions().enabled)
         {
-            logger.debug("Audit logging is enabled.");
-            this.auditLogger = getAuditLogger();
+            logger.info("Audit logging is enabled.");
+            this.auditLogger = getAuditLogger(DatabaseDescriptor.getAuditLoggingOptions().logger);
+//            this.isAuditLogEnabled = true;
         }
         else
         {
-            logger.debug("Audit logging is disabled.");
+            logger.info("Audit logging is disabled.");
         }
 
-        filter = AuditLogFilter.create();
+        filter = AuditLogFilter.create(DatabaseDescriptor.getAuditLoggingOptions());
     }
 
     public static AuditLogManager getInstance()
@@ -66,9 +67,8 @@ public class AuditLogManager
         return instance;
     }
 
-    private IAuditLogger getAuditLogger()
+    private IAuditLogger getAuditLogger(String loggerClassName) throws ConfigurationException
     {
-        String loggerClassName = DatabaseDescriptor.getAuditLoggingOptions().logger;
         if (loggerClassName != null)
         {
             return FBUtilities.newAuditLogger(loggerClassName);
@@ -85,7 +85,7 @@ public class AuditLogManager
 
     public boolean isAuditingEnabled()
     {
-        return DatabaseDescriptor.getAuditLoggingOptions().enabled;
+        return this.auditLogger != null;
     }
 
     public boolean isLoggingEnabled()
@@ -109,6 +109,7 @@ public class AuditLogManager
     public void log(AuditLogEntry logEntry)
     {
         if (isAuditingEnabled()
+            && (null != auditLogger)
             && (null != logEntry)
             && ((null == logEntry.getKeyspace()) || !isSystemKeyspace(logEntry.getKeyspace()))
             && (!filter.isFiltered(logEntry)))
@@ -166,27 +167,27 @@ public class AuditLogManager
          * We can run both the audit logger and the fq logger at the same time, hence this method ensures that it logs
          * to both the channels at same time.
          */
-        if(isAuditingEnabled())
+        if (isAuditingEnabled())
         {
             AuditLogEntry auditEntry = AuditLogEntry.getLogEntry(statement, query, state, options);
             this.log(auditEntry);
         }
 
-        if(isFQLEnabled())
+        if (isFQLEnabled())
         {
-            long fqlTime =  System.currentTimeMillis()-TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-queryStartNanoTime);
+            long fqlTime = System.currentTimeMillis() - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - queryStartNanoTime);
             FullQueryLogger.instance.logQuery(query, options, fqlTime);
         }
     }
 
     public void logBatch(String batchTypeName, List<Object> queryOrIdList, List<List<ByteBuffer>> values, List<ParsedStatement.Prepared> prepared, QueryOptions options, QueryState state, long queryStartNanoTime)
     {
-        if(isAuditingEnabled())
+        if (isAuditingEnabled())
         {
             log(AuditLogEntry.getLogEntriesForBatch(queryOrIdList, prepared, state, options));
         }
 
-        if(isFQLEnabled())
+        if (isFQLEnabled())
         {
             List<String> queryStrings = new ArrayList<>(queryOrIdList.size());
             for (ParsedStatement.Prepared prepStatment : prepared)
@@ -197,8 +198,38 @@ public class AuditLogManager
         }
     }
 
-    public void reloadFilters()
+    public synchronized void disableAuditLog()
     {
-        filter = AuditLogFilter.create();
+        logger.info("Audit logging is disabled, stopping any existing loggers"); //debug
+        if (this.auditLogger != null)
+        {
+            this.auditLogger.stop();
+            this.auditLogger = null;
+        }
+    }
+
+    public synchronized void enableAuditLog(AuditLogOptions auditLogOptions) throws ConfigurationException
+    {
+        logger.trace("Audit logging is being enabled. Reloading AuditLogOptions.");
+        IAuditLogger oldLogger = this.auditLogger;
+        filter = AuditLogFilter.create(auditLogOptions);
+
+        if (oldLogger != null && oldLogger.getClass().getSimpleName().equals(auditLogOptions.logger))
+        {
+            logger.info("New AuditLogger [{}] is same as existing logger, hence not initializing the logger", auditLogOptions.logger);
+            return;
+        }
+
+        this.auditLogger = getAuditLogger(auditLogOptions.logger);
+
+            /* Ensure oldLogger's stop() is called after we swap it with new logger otherwise,
+             * we might be calling log() on the stopped logger.
+             */
+
+        if (oldLogger != null)
+        {
+            oldLogger.stop();
+        }
+        logger.debug("Audit logging is enabled. Reloaded AuditLogOptions.");
     }
 }

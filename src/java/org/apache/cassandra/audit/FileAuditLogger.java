@@ -33,4 +33,10 @@ public class FileAuditLogger implements IAuditLogger
     {
         logger.info(logMessage.toString());
     }
+
+    @Override
+    public void stop()
+    {
+
+    }
 }

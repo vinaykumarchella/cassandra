@@ -18,6 +18,7 @@
 package org.apache.cassandra.audit;
 
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -37,31 +38,17 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 
-
 public class AuditLoggerTest extends CQLTester
 {
 
     @BeforeClass
     public static void setUp()
     {
-        DatabaseDescriptor.setAuditLogEnabled(true);
         AuditLogOptions options = new AuditLogOptions();
         options.enabled = true;
         options.logger = "InMemoryAuditLogger";
         DatabaseDescriptor.setAuditLoggingOptions(options);
         requireNetwork();
-
-    }
-
-    @Before
-    public void beforeTestMethod() throws Throwable
-    {
-        AuditLogOptions options = new AuditLogOptions();
-        options.enabled = true;
-        options.logger = "InMemoryAuditLogger";
-        DatabaseDescriptor.setAuditLoggingOptions(options);
-        StorageService.instance.reloadAuditLogFilters();
-
     }
 
     @AfterClass
@@ -69,6 +56,30 @@ public class AuditLoggerTest extends CQLTester
     {
     }
 
+    @Before
+    public void beforeTestMethod() throws Throwable
+    {
+        AuditLogOptions options = new AuditLogOptions();
+        enableAuditLogOptions(options);
+    }
+
+    private void enableAuditLogOptions(AuditLogOptions options)
+    {
+        String loggerName = "InMemoryAuditLogger";
+        String includedKeyspaces = options.included_keyspaces;
+        String excludedKeyspaces = options.excluded_keyspaces;
+        String includedCategories = options.included_categories;
+        String excludedCategories = options.excluded_categories;
+        String includedUsers = options.included_users;
+        String excludedUsers = options.excluded_users;
+
+        StorageService.instance.enableAuditLog(loggerName, includedKeyspaces, excludedKeyspaces, includedCategories, excludedCategories, includedUsers, excludedUsers);
+    }
+
+    private void disableAuditLogOptions()
+    {
+        StorageService.instance.disableAuditLog();
+    }
 
     @Test
     public void testAuditLogFilters() throws Throwable
@@ -78,48 +89,85 @@ public class AuditLoggerTest extends CQLTester
         execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 2, "trace", "test");
 
         AuditLogOptions options = new AuditLogOptions();
-        options.enabled = true;
-        options.logger = "InMemoryAuditLogger";
         options.excluded_keyspaces = KEYSPACE;
-        DatabaseDescriptor.setAuditLoggingOptions(options);
-        StorageService.instance.reloadAuditLogFilters();
+        enableAuditLogOptions(options);
 
         String cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
-        ResultSet rs  = executeAndAssertNoAuditLog(cql, 1);
+        ResultSet rs = executeAndAssertNoAuditLog(cql, 1);
         assertEquals(1, rs.all().size());
 
         options = new AuditLogOptions();
-        options.enabled = true;
-        options.logger = "InMemoryAuditLogger";
         options.included_keyspaces = KEYSPACE;
-        DatabaseDescriptor.setAuditLoggingOptions(options);
-        StorageService.instance.reloadAuditLogFilters();
+        enableAuditLogOptions(options);
 
         cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
-        rs  = executeAndAssertWithPrepare(cql, AuditLogEntryType.SELECT, 1);
+        rs = executeAndAssertWithPrepare(cql, AuditLogEntryType.SELECT, 1);
         assertEquals(1, rs.all().size());
 
         options = new AuditLogOptions();
-        options.enabled = true;
-        options.logger = "InMemoryAuditLogger";
         options.included_keyspaces = KEYSPACE;
         options.excluded_keyspaces = KEYSPACE;
-        DatabaseDescriptor.setAuditLoggingOptions(options);
-        StorageService.instance.reloadAuditLogFilters();
+        enableAuditLogOptions(options);
 
         cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
-        rs  = executeAndAssertNoAuditLog(cql, 1);
+        rs = executeAndAssertNoAuditLog(cql, 1);
         assertEquals(1, rs.all().size());
 
         options = new AuditLogOptions();
-        options.enabled = true;
-        options.logger = "InMemoryAuditLogger";
-        DatabaseDescriptor.setAuditLoggingOptions(options);
-        StorageService.instance.reloadAuditLogFilters();
+        enableAuditLogOptions(options);
 
         cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
-        rs  = executeAndAssertWithPrepare(cql, AuditLogEntryType.SELECT, 1);
+        rs = executeAndAssertWithPrepare(cql, AuditLogEntryType.SELECT, 1);
         assertEquals(1, rs.all().size());
+    }
+
+    @Test
+    public void testAuditLogFiltersTransitions() throws Throwable
+    {
+        createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
+        execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 1, "Apache", "Cassandra");
+        execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 2, "trace", "test");
+
+        AuditLogOptions options = new AuditLogOptions();
+        options.excluded_keyspaces = KEYSPACE;
+        enableAuditLogOptions(options);
+
+        String cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
+        ResultSet rs = executeAndAssertNoAuditLog(cql, 1);
+        assertEquals(1, rs.all().size());
+
+        disableAuditLogOptions();
+
+        cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
+        rs = executeAndAssertDisableAuditLog(cql, 1);
+        assertEquals(1, rs.all().size());
+
+        options = new AuditLogOptions();
+        options.included_keyspaces = KEYSPACE;
+        options.excluded_keyspaces = KEYSPACE;
+        enableAuditLogOptions(options);
+
+        cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
+        rs = executeAndAssertNoAuditLog(cql, 1);
+        assertEquals(1, rs.all().size());
+
+        disableAuditLogOptions();
+
+        cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
+        rs = executeAndAssertDisableAuditLog(cql, 1);
+        assertEquals(1, rs.all().size());
+    }
+
+    @Test
+    public void testAuditLogExceptions()
+    {
+        AuditLogOptions options = new AuditLogOptions();
+        options.excluded_keyspaces = KEYSPACE;
+        enableAuditLogOptions(options);
+        Assert.assertTrue(AuditLogManager.getInstance().isAuditingEnabled());
+
+        disableAuditLogOptions();
+
     }
 
     @Test
@@ -130,14 +178,10 @@ public class AuditLoggerTest extends CQLTester
         execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 1, "Apache", "Cassandra");
         execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 2, "trace", "test");
 
-
         AuditLogOptions options = new AuditLogOptions();
-        options.enabled = true;
-        options.logger = "InMemoryAuditLogger";
         options.excluded_categories = "QUERY";
         options.included_categories = "QUERY,DML";
-        DatabaseDescriptor.setAuditLoggingOptions(options);
-        StorageService.instance.reloadAuditLogFilters();
+        enableAuditLogOptions(options);
 
         //QUERY - Should be filtered, part of excluded categories,
         String cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = 1";
@@ -151,14 +195,12 @@ public class AuditLoggerTest extends CQLTester
         cql = "INSERT INTO " + KEYSPACE + '.' + currentTable() + " (id, v1, v2) VALUES (?, ?, ?)";
         executeAndAssertWithPrepare(cql, AuditLogEntryType.UPDATE, 1, "insert_audit", "test");
 
-
         //DDL - Should be filtered, not part of included categories
         cql = "ALTER TABLE  " + KEYSPACE + '.' + currentTable() + " ADD v3 text";
         session = sessionNet();
         rs = session.execute(cql);
         assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
     }
-
 
     @Test
     public void testCqlSELECTAuditing() throws Throwable
@@ -168,7 +210,7 @@ public class AuditLoggerTest extends CQLTester
         execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 2, "trace", "test");
 
         String cql = "SELECT id, v1, v2 FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
-        ResultSet rs  = executeAndAssertWithPrepare(cql, AuditLogEntryType.SELECT, 1);
+        ResultSet rs = executeAndAssertWithPrepare(cql, AuditLogEntryType.SELECT, 1);
 
         assertEquals(1, rs.all().size());
     }
@@ -180,7 +222,6 @@ public class AuditLoggerTest extends CQLTester
 
         String cql = "INSERT INTO " + KEYSPACE + '.' + currentTable() + "  (id, v1, v2) VALUES (?, ?, ?)";
         executeAndAssertWithPrepare(cql, AuditLogEntryType.UPDATE, 1, "insert_audit", "test");
-
     }
 
     @Test
@@ -195,7 +236,6 @@ public class AuditLoggerTest extends CQLTester
 
         cql = "UPDATE " + KEYSPACE + '.' + currentTable() + "  SET v1 = ? WHERE id = ?";
         executeAndAssertWithPrepare(cql, AuditLogEntryType.UPDATE, "AuditingTest", 2);
-
     }
 
     @Test
@@ -207,9 +247,7 @@ public class AuditLoggerTest extends CQLTester
 
         String cql = "DELETE FROM " + KEYSPACE + '.' + currentTable() + " WHERE id = ?";
         executeAndAssertWithPrepare(cql, AuditLogEntryType.DELETE, 1);
-
     }
-
 
     @Test
     public void testCqlTRUNCATEAuditing() throws Throwable
@@ -220,7 +258,6 @@ public class AuditLoggerTest extends CQLTester
 
         String cql = "TRUNCATE TABLE  " + KEYSPACE + '.' + currentTable();
         executeAndAssertWithPrepare(cql, AuditLogEntryType.TRUNCATE);
-
     }
 
     @Test
@@ -232,32 +269,31 @@ public class AuditLoggerTest extends CQLTester
 
         BatchStatement batchStatement = new BatchStatement();
 
-        String cqlInsert = "INSERT INTO "+KEYSPACE+"."+currentTable()+" (id, v1, v2) VALUES (?, ?, ?)";
+        String cqlInsert = "INSERT INTO " + KEYSPACE + "." + currentTable() + " (id, v1, v2) VALUES (?, ?, ?)";
         PreparedStatement prep = session.prepare(cqlInsert);
         AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(cqlInsert, AuditLogEntryType.PREPARE_STATEMENT, logEntry, false);
 
-        batchStatement.add(prep.bind(1,"Apapche","Cassandra"));
-        batchStatement.add(prep.bind(2,"Apapche1","Cassandra1"));
+        batchStatement.add(prep.bind(1, "Apapche", "Cassandra"));
+        batchStatement.add(prep.bind(2, "Apapche1", "Cassandra1"));
 
-        String cqlUpdate = "UPDATE "+KEYSPACE+"."+currentTable()+" SET v1 = ? WHERE id = ?";
+        String cqlUpdate = "UPDATE " + KEYSPACE + "." + currentTable() + " SET v1 = ? WHERE id = ?";
         prep = session.prepare(cqlUpdate);
         logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(cqlUpdate, AuditLogEntryType.PREPARE_STATEMENT, logEntry, false);
 
-        batchStatement.add(prep.bind("Apache Cassandra",1));
+        batchStatement.add(prep.bind("Apache Cassandra", 1));
 
-        String cqlDelete = "DELETE FROM "+KEYSPACE+"."+currentTable()+" WHERE id = ?";
+        String cqlDelete = "DELETE FROM " + KEYSPACE + "." + currentTable() + " WHERE id = ?";
         prep = session.prepare(cqlDelete);
         logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(cqlDelete, AuditLogEntryType.PREPARE_STATEMENT, logEntry, false);
 
         batchStatement.add(prep.bind(1));
 
-
         ResultSet rs = session.execute(batchStatement);
 
-        assertEquals(5,((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
+        assertEquals(5, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
         logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
 
         logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
@@ -274,8 +310,7 @@ public class AuditLoggerTest extends CQLTester
 
         int size = rs.all().size();
 
-        assertEquals(0,size);
-
+        assertEquals(0, size);
     }
 
     @Test
@@ -288,41 +323,39 @@ public class AuditLoggerTest extends CQLTester
 
         BatchStatement batchStatement = new BatchStatement();
 
-        String cqlInsert1 = "INSERT INTO "+KEYSPACE+"."+table1+" (id, v1, v2) VALUES (?, ?, ?)";
+        String cqlInsert1 = "INSERT INTO " + KEYSPACE + "." + table1 + " (id, v1, v2) VALUES (?, ?, ?)";
         PreparedStatement prep = session.prepare(cqlInsert1);
         AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(cqlInsert1, AuditLogEntryType.PREPARE_STATEMENT, logEntry, false);
 
-        batchStatement.add(prep.bind(1,"Apapche","Cassandra"));
+        batchStatement.add(prep.bind(1, "Apapche", "Cassandra"));
 
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
         String table2 = currentTable();
 
-        String cqlInsert2 = "INSERT INTO "+KEYSPACE+"."+table2+" (id, v1, v2) VALUES (?, ?, ?)";
+        String cqlInsert2 = "INSERT INTO " + KEYSPACE + "." + table2 + " (id, v1, v2) VALUES (?, ?, ?)";
         prep = session.prepare(cqlInsert2);
         logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(cqlInsert2, AuditLogEntryType.PREPARE_STATEMENT, logEntry, false);
 
-        batchStatement.add(prep.bind(1,"Apapche","Cassandra"));
-
+        batchStatement.add(prep.bind(1, "Apapche", "Cassandra"));
 
         createKeyspace("CREATE KEYSPACE %s WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }");
         String ks2 = currentKeyspace();
 
-        createTable(ks2,"CREATE TABLE %s (id int primary key, v1 text, v2 text)");
+        createTable(ks2, "CREATE TABLE %s (id int primary key, v1 text, v2 text)");
         String table3 = currentTable();
 
-        String cqlInsert3 = "INSERT INTO "+ks2+"."+table3+" (id, v1, v2) VALUES (?, ?, ?)";
+        String cqlInsert3 = "INSERT INTO " + ks2 + "." + table3 + " (id, v1, v2) VALUES (?, ?, ?)";
         prep = session.prepare(cqlInsert3);
         logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(cqlInsert3, AuditLogEntryType.PREPARE_STATEMENT, logEntry, false, ks2);
 
-        batchStatement.add(prep.bind(1,"Apapche","Cassandra"));
-
+        batchStatement.add(prep.bind(1, "Apapche", "Cassandra"));
 
         ResultSet rs = session.execute(batchStatement);
 
-        assertEquals(4,((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
+        assertEquals(4, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
         logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
 
         logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
@@ -336,47 +369,42 @@ public class AuditLoggerTest extends CQLTester
 
         int size = rs.all().size();
 
-        assertEquals(0,size);
-
+        assertEquals(0, size);
     }
-
-
 
     @Test
     public void testCqlKSAuditing() throws Throwable
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
 
-        String cql = "CREATE KEYSPACE "+createKeyspaceName()+" WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 2}  ";
+        String cql = "CREATE KEYSPACE " + createKeyspaceName() + " WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 2}  ";
         executeAndAssert(cql, AuditLogEntryType.CREATE_KEYSPACE, true, currentKeyspace());
 
-        cql = "CREATE KEYSPACE IF NOT EXISTS "+createKeyspaceName()+" WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 2}  ";
+        cql = "CREATE KEYSPACE IF NOT EXISTS " + createKeyspaceName() + " WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 2}  ";
         executeAndAssert(cql, AuditLogEntryType.CREATE_KEYSPACE, true, currentKeyspace());
 
-
-        cql = "ALTER KEYSPACE "+currentKeyspace()+" WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 2}  ";
+        cql = "ALTER KEYSPACE " + currentKeyspace() + " WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 2}  ";
         executeAndAssert(cql, AuditLogEntryType.ALTER_KEYSPACE, true, currentKeyspace());
 
-        cql = "DROP KEYSPACE "+currentKeyspace();
+        cql = "DROP KEYSPACE " + currentKeyspace();
         executeAndAssert(cql, AuditLogEntryType.DROP_KEYSPACE, true, currentKeyspace());
     }
 
     @Test
     public void testCqlTableAuditing() throws Throwable
     {
-        String cql = "CREATE TABLE "+KEYSPACE+"."+createTableName()+" (id int primary key, v1 text, v2 text)";
+        String cql = "CREATE TABLE " + KEYSPACE + "." + createTableName() + " (id int primary key, v1 text, v2 text)";
         executeAndAssert(cql, AuditLogEntryType.CREATE_TABLE);
 
-        cql = "CREATE TABLE IF NOT EXISTS "+KEYSPACE+"."+createTableName()+" (id int primary key, v1 text, v2 text)";
+        cql = "CREATE TABLE IF NOT EXISTS " + KEYSPACE + "." + createTableName() + " (id int primary key, v1 text, v2 text)";
         executeAndAssert(cql, AuditLogEntryType.CREATE_TABLE);
 
-        cql = "ALTER TABLE "+KEYSPACE+"."+currentTable()+" ADD v3 text";
+        cql = "ALTER TABLE " + KEYSPACE + "." + currentTable() + " ADD v3 text";
         executeAndAssert(cql, AuditLogEntryType.ALTER_TABLE);
 
-        cql = "DROP TABLE "+KEYSPACE+"."+currentTable();
+        cql = "DROP TABLE " + KEYSPACE + "." + currentTable();
         executeAndAssert(cql, AuditLogEntryType.DROP_TABLE);
     }
-
 
     @Test
     public void testCqlMVAuditing() throws Throwable
@@ -386,20 +414,18 @@ public class AuditLoggerTest extends CQLTester
         execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 2, "trace", "test");
 
         String tblName = currentTable();
-        String cql = "CREATE MATERIALIZED VIEW "+KEYSPACE+"."+createTableName()+" AS SELECT id,v1 FROM "+KEYSPACE+"."+tblName+" WHERE id IS NOT NULL AND v1 IS NOT NULL PRIMARY KEY ( id, v1 ) ";
+        String cql = "CREATE MATERIALIZED VIEW " + KEYSPACE + "." + createTableName() + " AS SELECT id,v1 FROM " + KEYSPACE + "." + tblName + " WHERE id IS NOT NULL AND v1 IS NOT NULL PRIMARY KEY ( id, v1 ) ";
         executeAndAssert(cql, AuditLogEntryType.CREATE_VIEW);
 
-        cql = "CREATE MATERIALIZED VIEW IF NOT EXISTS "+KEYSPACE+"."+currentTable()+" AS SELECT id,v1 FROM "+KEYSPACE+"."+tblName+" WHERE id IS NOT NULL AND v1 IS NOT NULL PRIMARY KEY ( id, v1 ) ";
+        cql = "CREATE MATERIALIZED VIEW IF NOT EXISTS " + KEYSPACE + "." + currentTable() + " AS SELECT id,v1 FROM " + KEYSPACE + "." + tblName + " WHERE id IS NOT NULL AND v1 IS NOT NULL PRIMARY KEY ( id, v1 ) ";
         executeAndAssert(cql, AuditLogEntryType.CREATE_VIEW);
 
-        cql = "ALTER MATERIALIZED VIEW "+KEYSPACE+"."+currentTable()+" WITH caching = {  'keys' : 'NONE' };";
+        cql = "ALTER MATERIALIZED VIEW " + KEYSPACE + "." + currentTable() + " WITH caching = {  'keys' : 'NONE' };";
         executeAndAssert(cql, AuditLogEntryType.ALTER_VIEW);
 
-        cql = "DROP MATERIALIZED VIEW "+KEYSPACE+"."+currentTable();
+        cql = "DROP MATERIALIZED VIEW " + KEYSPACE + "." + currentTable();
         executeAndAssert(cql, AuditLogEntryType.DROP_VIEW);
     }
-
-
 
     @Test
     public void testCqlTYPEAuditing() throws Throwable
@@ -408,25 +434,24 @@ public class AuditLoggerTest extends CQLTester
 
         String tblName = createTableName();
 
-        String cql = "CREATE TYPE "+KEYSPACE+"."+tblName+" (id int, v1 text, v2 text)";
+        String cql = "CREATE TYPE " + KEYSPACE + "." + tblName + " (id int, v1 text, v2 text)";
         executeAndAssert(cql, AuditLogEntryType.CREATE_TYPE);
 
-        cql = "CREATE TYPE IF NOT EXISTS "+KEYSPACE+"."+tblName+" (id int, v1 text, v2 text)";
+        cql = "CREATE TYPE IF NOT EXISTS " + KEYSPACE + "." + tblName + " (id int, v1 text, v2 text)";
         executeAndAssert(cql, AuditLogEntryType.CREATE_TYPE);
 
-        cql = "ALTER TYPE "+KEYSPACE+"."+tblName+" ADD v3 int";
+        cql = "ALTER TYPE " + KEYSPACE + "." + tblName + " ADD v3 int";
         executeAndAssert(cql, AuditLogEntryType.ALTER_TYPE);
 
-        cql = "ALTER TYPE "+KEYSPACE+"."+tblName+" RENAME v3 TO v4";
+        cql = "ALTER TYPE " + KEYSPACE + "." + tblName + " RENAME v3 TO v4";
         executeAndAssert(cql, AuditLogEntryType.ALTER_TYPE);
 
-        cql = "DROP TYPE "+KEYSPACE+"."+tblName;
+        cql = "DROP TYPE " + KEYSPACE + "." + tblName;
         executeAndAssert(cql, AuditLogEntryType.DROP_TYPE);
 
-        cql = "DROP TYPE IF EXISTS "+KEYSPACE+"."+tblName;
+        cql = "DROP TYPE IF EXISTS " + KEYSPACE + "." + tblName;
         executeAndAssert(cql, AuditLogEntryType.DROP_TYPE);
     }
-
 
     @Test
     public void testCqlINDEXAuditing() throws Throwable
@@ -437,12 +462,11 @@ public class AuditLoggerTest extends CQLTester
 
         String indexName = createTableName();
 
-        String cql = "CREATE INDEX "+indexName+" ON "+KEYSPACE+"."+tblName+" (v1)";
+        String cql = "CREATE INDEX " + indexName + " ON " + KEYSPACE + "." + tblName + " (v1)";
         executeAndAssert(cql, AuditLogEntryType.CREATE_INDEX);
 
-        cql = "DROP INDEX "+KEYSPACE+"."+indexName;
+        cql = "DROP INDEX " + KEYSPACE + "." + indexName;
         executeAndAssert(cql, AuditLogEntryType.DROP_INDEX);
-
     }
 
     @Test
@@ -451,12 +475,11 @@ public class AuditLoggerTest extends CQLTester
 
         String tblName = createTableName();
 
-        String cql = "CREATE FUNCTION IF NOT EXISTS  "+KEYSPACE+"."+tblName+" (column TEXT,num int) RETURNS NULL ON NULL INPUT RETURNS text LANGUAGE javascript AS $$ column.substring(0,num) $$";
+        String cql = "CREATE FUNCTION IF NOT EXISTS  " + KEYSPACE + "." + tblName + " (column TEXT,num int) RETURNS NULL ON NULL INPUT RETURNS text LANGUAGE javascript AS $$ column.substring(0,num) $$";
         executeAndAssert(cql, AuditLogEntryType.CREATE_FUNCTION);
 
-        cql = "DROP FUNCTION "+KEYSPACE+"."+tblName;
+        cql = "DROP FUNCTION " + KEYSPACE + "." + tblName;
         executeAndAssert(cql, AuditLogEntryType.DROP_FUNCTION);
-
     }
 
     @Test
@@ -468,22 +491,18 @@ public class AuditLoggerTest extends CQLTester
         String tblName = currentTable();
         String triggerName = createTableName();
 
-        String cql = "DROP TRIGGER IF EXISTS "+triggerName+ " ON "+KEYSPACE+"."+tblName;
+        String cql = "DROP TRIGGER IF EXISTS " + triggerName + " ON " + KEYSPACE + "." + tblName;
         executeAndAssert(cql, AuditLogEntryType.DROP_TRIGGER);
-
     }
-
 
     @Test
     public void testCqlAGGREGATEAuditing() throws Throwable
     {
         String aggName = createTableName();
 
-        String cql = "DROP AGGREGATE IF EXISTS "+KEYSPACE+"."+aggName;
+        String cql = "DROP AGGREGATE IF EXISTS " + KEYSPACE + "." + aggName;
         executeAndAssert(cql, AuditLogEntryType.DROP_AGGREGATE);
-
     }
-
 
     @Test
     public void testCqlQuerySyntaxError()
@@ -502,13 +521,14 @@ public class AuditLoggerTest extends CQLTester
         }
         AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(logEntry, cql);
-        assertEquals(0,((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
+        assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
     }
+
     @Test
     public void testCqlPrepareQueryError()
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
-        String cql = "INSERT INTO " + KEYSPACE + '.'+currentTable()+ " (id, v1, v2) VALUES (?,?,?)";
+        String cql = "INSERT INTO " + KEYSPACE + '.' + currentTable() + " (id, v1, v2) VALUES (?,?,?)";
         try
         {
 
@@ -520,7 +540,6 @@ public class AuditLoggerTest extends CQLTester
 
             dropTable("DROP TABLE %s");
             ResultSet rs = session.execute(pstmt.bind(1, "insert_audit", "test"));
-
         }
         catch (NoHostAvailableException e)
         {
@@ -529,13 +548,13 @@ public class AuditLoggerTest extends CQLTester
         assertLogEntry(logEntry, null);
         logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(logEntry, cql);
-        assertEquals(0,((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
+        assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
     }
 
     @Test
     public void testCqlPrepareQuerySyntaxError()
     {
-        String cql = "INSERT INTO " + KEYSPACE + '.'+"foo"+ "(id, v1, v2) VALES (?,?,?)";
+        String cql = "INSERT INTO " + KEYSPACE + '.' + "foo" + "(id, v1, v2) VALES (?,?,?)";
         try
         {
             createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
@@ -544,16 +563,14 @@ public class AuditLoggerTest extends CQLTester
 
             PreparedStatement pstmt = session.prepare(cql);
             ResultSet rs = session.execute(pstmt.bind(1, "insert_audit", "test"));
-
         }
         catch (SyntaxError e)
         {
         }
         AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(logEntry, cql);
-        assertEquals(0,((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
+        assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
     }
-
 
     /**
      * Helper methods for Audit Log CQL Testing
@@ -561,7 +578,7 @@ public class AuditLoggerTest extends CQLTester
 
     private ResultSet executeAndAssert(String cql, AuditLogEntryType type) throws Throwable
     {
-       return executeAndAssert(cql, type, false, KEYSPACE);
+        return executeAndAssert(cql, type, false, KEYSPACE);
     }
 
     private ResultSet executeAndAssert(String cql, AuditLogEntryType type, boolean isTableNull, String keyspace) throws Throwable
@@ -576,10 +593,12 @@ public class AuditLoggerTest extends CQLTester
         assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
         return rs;
     }
+
     private ResultSet executeAndAssertWithPrepare(String cql, AuditLogEntryType exceuteType, Object... bindValues) throws Throwable
     {
-        return executeAndAssertWithPrepare(cql,exceuteType,false,bindValues);
+        return executeAndAssertWithPrepare(cql, exceuteType, false, bindValues);
     }
+
     private ResultSet executeAndAssertWithPrepare(String cql, AuditLogEntryType exceuteType, boolean isTableNull, Object... bindValues) throws Throwable
     {
         Session session = sessionNet();
@@ -597,44 +616,55 @@ public class AuditLoggerTest extends CQLTester
         return rs;
     }
 
-    private ResultSet executeAndAssertNoAuditLog(String cql,  Object... bindValues) throws Throwable
+    private ResultSet executeAndAssertNoAuditLog(String cql, Object... bindValues) throws Throwable
     {
         Session session = sessionNet();
 
         PreparedStatement pstmt = session.prepare(cql);
         ResultSet rs = session.execute(pstmt.bind(bindValues));
 
-        assertEquals(0,((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
+        assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
         return rs;
     }
 
+    private ResultSet executeAndAssertDisableAuditLog(String cql, Object... bindValues) throws Throwable
+    {
+        Session session = sessionNet();
+
+        PreparedStatement pstmt = session.prepare(cql);
+        ResultSet rs = session.execute(pstmt.bind(bindValues));
+
+        assertNull(AuditLogManager.getInstance().getLogger());
+        return rs;
+    }
 
     private void assertLogEntry(String cql, AuditLogEntryType type, AuditLogEntry actual, boolean isTableNull)
     {
-        assertLogEntry(cql,type,actual,isTableNull, KEYSPACE);
+        assertLogEntry(cql, type, actual, isTableNull, KEYSPACE);
     }
+
     private void assertLogEntry(String cql, AuditLogEntryType type, AuditLogEntry actual, boolean isTableNull, String keyspace)
     {
-       assertLogEntry(cql,currentTable(),type,actual,isTableNull,keyspace);
-
+        assertLogEntry(cql, currentTable(), type, actual, isTableNull, keyspace);
     }
+
     private void assertLogEntry(String cql, String table, AuditLogEntryType type, AuditLogEntry actual, boolean isTableNull, String keyspace)
     {
         assertEquals(keyspace, actual.getKeyspace());
-        if(!isTableNull)
+        if (!isTableNull)
         {
             assertEquals(table, actual.getScope());
         }
         assertEquals(type, actual.getType());
-        assertEquals(cql,actual.getOperation());
-
+        assertEquals(cql, actual.getOperation());
     }
+
     private void assertLogEntry(AuditLogEntry logEntry, String cql)
     {
         assertNull(logEntry.getKeyspace());
         assertNull(logEntry.getScope());
         assertEquals(AuditLogEntryType.REQUEST_FAILURE, logEntry.getType());
-        if(null != cql && !cql.isEmpty())
+        if (null != cql && !cql.isEmpty())
         {
             assertThat(logEntry.getOperation(), containsString(cql));
         }

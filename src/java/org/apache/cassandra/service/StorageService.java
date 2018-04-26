@@ -37,6 +37,7 @@ import javax.management.openmbean.TabularData;
 import javax.management.openmbean.TabularDataSupport;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
@@ -47,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.audit.AuditLogManager;
+import org.apache.cassandra.audit.AuditLogOptions;
 import org.apache.cassandra.auth.AuthKeyspace;
 import org.apache.cassandra.auth.AuthSchemaChangeListener;
 import org.apache.cassandra.batchlog.BatchRemoveVerbHandler;
@@ -5391,23 +5393,46 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
     }
     public void disableAuditLog()
     {
-        logger.info("Disabling AuditLog");
-        DatabaseDescriptor.setAuditLogEnabled(false);
+        AuditLogManager.getInstance().disableAuditLog();
+        logger.info("Auditlog is disabled");
     }
 
-    public void enableAuditLog()
+    public void enableAuditLog(String loggerName, String includedKeyspaces, String excludedKeyspaces, String includedCategories, String excludedCategories, String includedUsers, String excludedUsers) throws ConfigurationException, IllegalStateException
     {
-        logger.info("Enabling AuditLog");
-        DatabaseDescriptor.setAuditLogEnabled(true);
+        loggerName = loggerName != null ? loggerName : DatabaseDescriptor.getAuditLoggingOptions().logger;
+
+        Preconditions.checkNotNull(loggerName, "cassandra.yaml did not have logger in audit_logging_option and not set as parameter");
+        Preconditions.checkState(FBUtilities.isAuditLoggerClassExists(loggerName), "Unable to find AuditLogger class: "+loggerName);
+
+        includedKeyspaces = includedKeyspaces != null ? includedKeyspaces : DatabaseDescriptor.getAuditLoggingOptions().included_keyspaces;
+        excludedKeyspaces = excludedKeyspaces != null ? excludedKeyspaces : DatabaseDescriptor.getAuditLoggingOptions().excluded_keyspaces;
+        includedCategories = includedCategories != null ? includedCategories : DatabaseDescriptor.getAuditLoggingOptions().included_categories;
+        excludedCategories = excludedCategories != null ? excludedCategories : DatabaseDescriptor.getAuditLoggingOptions().excluded_categories;
+        includedUsers = includedUsers != null ? includedUsers : DatabaseDescriptor.getAuditLoggingOptions().included_users;
+        excludedUsers= excludedUsers != null ? excludedUsers : DatabaseDescriptor.getAuditLoggingOptions().excluded_users;
+
+        AuditLogOptions auditLogOptions = new AuditLogOptions();
+        auditLogOptions.enabled = true;
+        auditLogOptions.logger = loggerName;
+        auditLogOptions.included_keyspaces = includedKeyspaces;
+        auditLogOptions.excluded_keyspaces = excludedKeyspaces;
+        auditLogOptions.included_categories = includedCategories;
+        auditLogOptions.excluded_categories = excludedCategories;
+        auditLogOptions.included_users = includedUsers;
+        auditLogOptions.excluded_users= excludedUsers;
+
+        AuditLogManager.getInstance().enableAuditLog(auditLogOptions);
+
+        logger.info("AuditLog is enabled with logger: [{}], included_keyspaces: [{}], excluded_keyspaces: [{}], " +
+                    "included_categories: [{}], excluded_categories: [{}]," +
+                    "included_users: [{}], excluded_users: [{}],", loggerName, includedKeyspaces, excludedKeyspaces,
+                    includedCategories, excludedCategories, includedUsers, excludedUsers);
+
     }
 
     public boolean isAuditLogEnabled()
     {
-        return DatabaseDescriptor.getAuditLoggingOptions().enabled;
+        return AuditLogManager.getInstance().isAuditingEnabled();
     }
 
-    public void reloadAuditLogFilters()
-    {
-        AuditLogManager.getInstance().reloadFilters();
-    }
 }

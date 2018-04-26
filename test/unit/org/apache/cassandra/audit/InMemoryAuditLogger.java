@@ -39,4 +39,9 @@ public class InMemoryAuditLogger implements IAuditLogger
 
         inMemQueue.offer(logMessage);
     }
+
+    public void stop()
+    {
+        inMemQueue.clear();
+    }
 }

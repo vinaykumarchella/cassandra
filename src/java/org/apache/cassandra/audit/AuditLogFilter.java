@@ -24,8 +24,6 @@ import com.google.common.collect.ImmutableSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.cassandra.config.DatabaseDescriptor;
-
 public class AuditLogFilter
 {
     private static final Logger logger = LoggerFactory.getLogger(AuditLogFilter.class);
@@ -50,7 +48,7 @@ public class AuditLogFilter
     /**
      * (Re-)Loads filters from config. Called during startup as well as JMX filter reload.
      */
-    public static AuditLogFilter create()
+    public static AuditLogFilter create(AuditLogOptions auditLogOptions)
     {
         logger.trace("Loading AuditLog filters");
         Set<String> includedKeyspacesSet = new HashSet<>();
@@ -62,14 +60,14 @@ public class AuditLogFilter
         Set<String> excludedUsersSet = new HashSet<>();
         Set<String> includedUsersSet = new HashSet<>();
 
-        loadInputSets(includedKeyspacesSet, DatabaseDescriptor.getAuditLoggingOptions().included_keyspaces,
-                      excludedKeyspacesSet, DatabaseDescriptor.getAuditLoggingOptions().excluded_keyspaces);
+        loadInputSets(includedKeyspacesSet, auditLogOptions.included_keyspaces,
+                      excludedKeyspacesSet, auditLogOptions.excluded_keyspaces);
 
-        loadInputSets(includedCategoriesSet, DatabaseDescriptor.getAuditLoggingOptions().included_categories,
-                      excludedCategoriesSet, DatabaseDescriptor.getAuditLoggingOptions().excluded_categories);
+        loadInputSets(includedCategoriesSet, auditLogOptions.included_categories,
+                      excludedCategoriesSet, auditLogOptions.excluded_categories);
 
-        loadInputSets(includedUsersSet, DatabaseDescriptor.getAuditLoggingOptions().included_users,
-                      excludedUsersSet, DatabaseDescriptor.getAuditLoggingOptions().excluded_users);
+        loadInputSets(includedUsersSet, auditLogOptions.included_users,
+                      excludedUsersSet, auditLogOptions.excluded_users);
 
 
         return new AuditLogFilter(ImmutableSet.copyOf(excludedKeyspacesSet), ImmutableSet.copyOf(includedKeyspacesSet),

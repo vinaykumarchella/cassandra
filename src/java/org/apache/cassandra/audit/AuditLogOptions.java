@@ -20,7 +20,7 @@ package org.apache.cassandra.audit;
 public class AuditLogOptions
 {
     public volatile boolean enabled = false;
-    public String logger = BinAuditLogger.class.getName();
+    public String logger = BinAuditLogger.class.getSimpleName();
     public String included_keyspaces = "";
     public String excluded_keyspaces = "";
     public String included_categories = "";

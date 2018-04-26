@@ -16,10 +16,18 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra.audit;
+package org.apache.cassandra.tools.nodetool;
 
-public abstract interface IAuditLogger
+import io.airlift.airline.Command;
+import org.apache.cassandra.tools.NodeProbe;
+import org.apache.cassandra.tools.NodeTool.NodeToolCmd;
+
+@Command(name = "disableauditlog", description = "Disable the audit log")
+public class DisableAuditLog extends NodeToolCmd
 {
-    public abstract void log(AuditLogEntry logMessage);
-    public abstract void stop();
+    @Override
+    public void execute(NodeProbe probe)
+    {
+        probe.disableAuditLog();
+    }
 }

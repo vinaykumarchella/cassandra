@@ -49,7 +49,6 @@ public class BinAuditLoggerTest extends CQLTester
     {
         tempDir = BinLogTest.tempDir();
 
-        DatabaseDescriptor.setAuditLogEnabled(true);
         AuditLogOptions options = new AuditLogOptions();
         options.enabled = true;
         options.logger = "BinAuditLogger";
@@ -57,7 +56,6 @@ public class BinAuditLoggerTest extends CQLTester
         options.audit_logs_dir = tempDir.toString();
         DatabaseDescriptor.setAuditLoggingOptions(options);
         requireNetwork();
-
     }
 
     @Test
@@ -81,16 +79,15 @@ public class BinAuditLoggerTest extends CQLTester
             ExcerptTailer tailer = queue.createTailer();
             assertTrue(tailer.readDocument(wire -> {
                 assertEquals("AuditLog", wire.read("type").text());
-                assertThat(wire.read("message").text(), containsString( AuditLogEntryType.PREPARE_STATEMENT.toString()));
+                assertThat(wire.read("message").text(), containsString(AuditLogEntryType.PREPARE_STATEMENT.toString()));
             }));
 
             assertTrue(tailer.readDocument(wire -> {
                 assertEquals("AuditLog", wire.read("type").text());
-                assertThat(wire.read("message").text(), containsString( AuditLogEntryType.SELECT.toString()));
+                assertThat(wire.read("message").text(), containsString(AuditLogEntryType.SELECT.toString()));
             }));
-            assertFalse(tailer.readDocument(wire -> {}));
-
+            assertFalse(tailer.readDocument(wire -> {
+            }));
         }
     }
-
 }
