@@ -166,7 +166,7 @@ public class ExecuteMessage extends Message.Request
 
             Message.Response response = handler.processPrepared(statement, state, queryOptions, getCustomPayload(), queryStartNanoTime);
 
-            if(isLoggingEnabled)
+            if (isLoggingEnabled)
             {
                 auditLogManager.log(statement, prepared.rawCQLStatement, options, state, queryStartNanoTime);
             }
@@ -208,7 +208,7 @@ public class ExecuteMessage extends Message.Request
         }
         catch (Exception e)
         {
-            if(auditLogEnabled)
+            if (auditLogEnabled)
             {
                 if (e instanceof PreparedQueryNotFoundException)
                 {

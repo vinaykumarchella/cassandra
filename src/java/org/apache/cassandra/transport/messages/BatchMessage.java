@@ -227,7 +227,7 @@ public class BatchMessage extends Message.Request
 
             Message.Response response = handler.processBatch(batch, state, batchOptions, getCustomPayload(), queryStartNanoTime);
 
-            if(isLoggingEnabled)
+            if (isLoggingEnabled)
             {
                 auditLogManager.logBatch(batchType.name(), queryOrIdList, values, prepared, options, state, queryStartNanoTime);
             }
@@ -240,7 +240,7 @@ public class BatchMessage extends Message.Request
         }
         catch (Exception e)
         {
-            if(auditLogEnabled)
+            if (auditLogEnabled)
             {
                 AuditLogEntry event = AuditLogEntry.getLogEntry(getAuditString(), state, this.options);
                 event.setType(AuditLogEntryType.BATCH);

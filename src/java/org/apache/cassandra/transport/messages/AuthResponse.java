@@ -81,7 +81,7 @@ public class AuthResponse extends Message.Request
                 AuthenticatedUser user = negotiator.getAuthenticatedUser();
                 queryState.getClientState().login(user);
                 AuthMetrics.instance.markSuccess();
-                if(auditLogEnabled)
+                if (auditLogEnabled)
                 {
                     AuditLogEntry auditEntry = AuditLogEntry.getLogEntry("LOGIN SUCCESSFUL", queryState, AuditLogEntryType.LOGIN_SUCCESS);
                     auditLogManager.log(auditEntry);
@@ -97,7 +97,7 @@ public class AuthResponse extends Message.Request
         catch (AuthenticationException e)
         {
             AuthMetrics.instance.markFailure();
-            if(auditLogEnabled)
+            if (auditLogEnabled)
             {
                 AuditLogEntry auditEntry = AuditLogEntry.getLogEntry("LOGIN FAILURE", queryState, AuditLogEntryType.LOGIN_ERROR);
                 auditLogManager.log(auditEntry, e);

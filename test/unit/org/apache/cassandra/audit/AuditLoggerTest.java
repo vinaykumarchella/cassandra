@@ -167,7 +167,6 @@ public class AuditLoggerTest extends CQLTester
         Assert.assertTrue(AuditLogManager.getInstance().isAuditingEnabled());
 
         disableAuditLogOptions();
-
     }
 
     @Test

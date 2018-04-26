@@ -43,7 +43,7 @@ public class AuditLogEntry
     private long timestamp;
     private AuditLogEntryType type;
     private UUID batch;
-    private String keyspace, scope, operation="";
+    private String keyspace, scope, operation = "";
 
     public AuditLogEntry(String source, int srcPort, String user)
     {
@@ -114,7 +114,6 @@ public class AuditLogEntry
         return builder.toString();
     }
 
-
     public String getUser()
     {
         return this.user;
@@ -178,7 +177,7 @@ public class AuditLogEntry
 
     public void appendToOperation(String str)
     {
-        if(StringUtils.isNotBlank(str))
+        if (StringUtils.isNotBlank(str))
         {
             this.operation = this.operation.concat("; ").concat(str);
         }
@@ -186,7 +185,7 @@ public class AuditLogEntry
 
     private static InetSocketAddress getSource(ClientState state)
     {
-        if (state!=null && state.getRemoteAddress() != null)
+        if (state != null && state.getRemoteAddress() != null)
         {
             return state.getRemoteAddress();
         }

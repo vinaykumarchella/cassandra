@@ -96,8 +96,8 @@ public class AuditLogFilterTest
         Assert.assertTrue(isFiltered("d", includeSet, excludeSet));
         Assert.assertTrue(isFiltered("e", includeSet, excludeSet));
         Assert.assertTrue(isFiltered("f", includeSet, excludeSet));
-
     }
+
     @Test
     public void isFiltered_UnSpecifiedInput()
     {

@@ -72,7 +72,7 @@ public class Dump implements Runnable
             String type = wireIn.read("type").text();
             sb.append("Type: ").append(type).append(System.lineSeparator());
             assert type != null;
-            if(type.equals("AuditLog"))
+            if (type.equals("AuditLog"))
             {
                 sb.append("LogMessage: ").append(wireIn.read("message").text()).append(System.lineSeparator());
 

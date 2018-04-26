@@ -43,7 +43,7 @@ public class BinAuditLogger extends FullQueryLogger implements IAuditLogger
     @Override
     public void log(AuditLogEntry logMessage)
     {
-        if(logMessage != null)
+        if (logMessage != null)
         {
             log(logMessage.toString());
         }

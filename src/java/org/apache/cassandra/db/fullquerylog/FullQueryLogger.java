@@ -133,7 +133,7 @@ public class FullQueryLogger
             throw new IllegalStateException("Already configured");
         }
 
-        if(cleanDirectory)
+        if (cleanDirectory)
         {
             logger.info("Cleaning directory: {} as requested",path);
             if (path.toFile().exists())

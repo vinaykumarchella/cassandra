@@ -118,7 +118,7 @@ public class QueryMessage extends Message.Request
 
             Message.Response response = ClientState.getCQLQueryHandler().process(query, state, options, getCustomPayload(), queryStartNanoTime);
 
-            if(isLoggingEnabled)
+            if (isLoggingEnabled)
             {
                 ParsedStatement.Prepared parsedStmt = QueryProcessor.parseStatement(query, state.getClientState());
                 auditLogManager.log(parsedStmt.statement, query, options, state, queryStartNanoTime);
@@ -134,7 +134,7 @@ public class QueryMessage extends Message.Request
         }
         catch (Exception e)
         {
-            if(auditLogEnabled)
+            if (auditLogEnabled)
             {
                 AuditLogEntry auditEntry = AuditLogEntry.getLogEntry(query, state, options);
                 auditLogManager.log(auditEntry, e);

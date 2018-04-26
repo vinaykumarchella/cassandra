@@ -117,7 +117,7 @@ public class PrepareMessage extends Message.Request
             Message.Response response = ClientState.getCQLQueryHandler().prepare(query,
                                                                                  state.getClientState().cloneWithKeyspaceIfSet(keyspace),
                                                                                  getCustomPayload());
-            if(auditLogEnabled)
+            if (auditLogEnabled)
             {
                 ParsedStatement.Prepared parsedStmt = QueryProcessor.parseStatement(query, state.getClientState());
                 AuditLogEntry auditEntry = AuditLogEntry.getLogEntry(parsedStmt.statement, query, state, AuditLogEntryType.PREPARE_STATEMENT);
@@ -131,7 +131,7 @@ public class PrepareMessage extends Message.Request
         }
         catch (Exception e)
         {
-            if(auditLogEnabled)
+            if (auditLogEnabled)
             {
                 AuditLogEntry auditEntry = AuditLogEntry
                                            .getLogEntry(query, state, AuditLogEntryType.PREPARE_STATEMENT)
