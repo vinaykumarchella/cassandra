@@ -57,15 +57,75 @@ Each audit log implementation has access to the following attributes, and for th
 
 How to configure
 ^^^^^^^^^^^^^^^^^
-``enabled``: This option enables/ disables audit log
-``logger``: Class name of the logger/ custom logger.
-``included_keyspaces``: Comma separated list of keyspaces to be included in audit log, default - includes all keyspaces
-``excluded_keyspaces``: Comma separated list of keyspaces to be excluded from audit log, default - excludes no keyspace
-``included_categories``: Comma separated list of Audit Log Categories to be included in audit log, default - includes all categories
-``excluded_categories``: Comma separated list of Audit Log Categories to be excluded from audit log, default - excludes no category
-``included_users``: Comma separated list of users to be included in audit log, default - includes all users
-``excluded_users``: Comma separated list of users to be excluded from audit log, default - excludes no user
-  List of available categories are found in org.apache.cassandra.audit.AuditLogEntryType.java file
+Auditlog can be configured using cassandra.yaml. If you want to try Auditlog on one node, it can also be enabled and configured using ``nodetool``.
+
+cassandra.yaml configurations for AuditLog
+"""""""""""""""""""""""""""""
+	- ``enabled``: This option enables/ disables audit log
+	- ``logger``: Class name of the logger/ custom logger.
+	- ``included_keyspaces``: Comma separated list of keyspaces to be included in audit log, default - includes all keyspaces
+	- ``excluded_keyspaces``: Comma separated list of keyspaces to be excluded from audit log, default - excludes no keyspace
+	- ``included_categories``: Comma separated list of Audit Log Categories to be included in audit log, default - includes all categories
+	- ``excluded_categories``: Comma separated list of Audit Log Categories to be excluded from audit log, default - excludes no category
+	- ``included_users``: Comma separated list of users to be included in audit log, default - includes all users
+	- ``excluded_users``: Comma separated list of users to be excluded from audit log, default - excludes no user
+
+List of available categories are found in ``org.apache.cassandra.audit.AuditLogEntryType.java`` file
+
+NodeTool command to enable AuditLog
+"""""""""""""""""""""""""""""""""""
+``enableauditlog``: Enables AuditLog with yaml defaults. yaml configurations can be overridden using options via nodetool command.
+
+::
+
+    nodetool enableauditlog
+
+Options
+*******
+
+
+``--excluded-categories``
+    Comma separated list of Audit Log Categories to be excluded for
+    audit log. If not set the value from cassandra.yaml will be used
+
+``--excluded-keyspaces``
+    Comma separated list of keyspaces to be excluded for audit log. If
+    not set the value from cassandra.yaml will be used
+
+``--excluded-users``
+    Comma separated list of users to be excluded for audit log. If not
+    set the value from cassandra.yaml will be used
+
+``--included-categories``
+    Comma separated list of Audit Log Categories to be included for
+    audit log. If not set the value from cassandra.yaml will be used
+
+``--included-keyspaces``
+    Comma separated list of keyspaces to be included for audit log. If
+    not set the value from cassandra.yaml will be used
+
+``--included-users``
+    Comma separated list of users to be included for audit log. If not
+    set the value from cassandra.yaml will be used
+
+``--logger``
+    Logger name to be used for AuditLogging. Default BinAuditLogger. If
+    not set the value from cassandra.yaml will be used
+
+
+NodeTool command to disable AuditLog
+"""""""""""""""""""""""""""""""""""
+
+``disableauditlog``: Disables AuditLog.
+
+::
+
+    nodetool disableuditlog
+
+
+
+
+
 
 Sample output
 ^^^^^^^^^^^^^^^^^
