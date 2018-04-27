@@ -34,6 +34,7 @@ import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.service.StorageService;
 
 import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
@@ -633,7 +634,7 @@ public class AuditLoggerTest extends CQLTester
         PreparedStatement pstmt = session.prepare(cql);
         ResultSet rs = session.execute(pstmt.bind(bindValues));
 
-        assertNull(AuditLogManager.getInstance().getLogger());
+        assertThat(AuditLogManager.getInstance().getLogger(),instanceOf(NoOpAuditLogger.class));
         return rs;
     }
 

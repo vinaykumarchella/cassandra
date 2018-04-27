@@ -46,17 +46,19 @@ public class AuditLogManager
 
     private IAuditLogger auditLogger;
     private volatile AuditLogFilter filter;
+    private volatile boolean isAuditLogEnabled = false;
     private AuditLogManager()
     {
         if (DatabaseDescriptor.getAuditLoggingOptions().enabled)
         {
             logger.info("Audit logging is enabled.");
             this.auditLogger = getAuditLogger(DatabaseDescriptor.getAuditLoggingOptions().logger);
-//            this.isAuditLogEnabled = true;
+            this.isAuditLogEnabled = true;
         }
         else
         {
             logger.info("Audit logging is disabled.");
+            this.isAuditLogEnabled = false;
         }
 
         filter = AuditLogFilter.create(DatabaseDescriptor.getAuditLoggingOptions());
@@ -85,7 +87,7 @@ public class AuditLogManager
 
     public boolean isAuditingEnabled()
     {
-        return this.auditLogger != null;
+        return this.isAuditLogEnabled;
     }
 
     public boolean isLoggingEnabled()
@@ -198,20 +200,40 @@ public class AuditLogManager
         }
     }
 
+    /**
+     * Disables AuditLog, this is supposed to be used only via JMX/ Nodetool. Not designed to call from anywhere else in the codepath
+     */
     public synchronized void disableAuditLog()
     {
-        logger.info("Audit logging is disabled, stopping any existing loggers"); //debug
-        if (this.auditLogger != null)
+        logger.info("Audit logging is disabled, stopping any existing loggers");
+        if (this.isAuditingEnabled())
         {
-            this.auditLogger.stop();
-            this.auditLogger = null;
+            /*
+             * Disable isAuditLogEnabled before attempting to cleanup/ stop AuditLogger so that any incoming log() requests
+             * would be filtered. To avoid further race conditions, this.auditLogger is swapped with No-Op implementation
+             * of IAuditLogger.
+             */
+
+            this.isAuditLogEnabled = false;
+            IAuditLogger oldLogger = this.auditLogger;
+            /*
+             * Avoid race conditions by passing NoOpAuditLogger while disabling auditlog via nodetool
+             */
+            this.auditLogger = getAuditLogger("NoOpAuditLogger");
+            oldLogger.stop();
         }
     }
 
+    /**
+     * Enables AuditLog, this is supposed to be used only via JMX/ Nodetool. Not designed to call from anywhere else in the codepath
+     * @param auditLogOptions AuditLogOptions to be used for enabling AuditLog
+     * @throws ConfigurationException It can throw configuration exception when provided logger class does not exist in the classpath
+     */
     public synchronized void enableAuditLog(AuditLogOptions auditLogOptions) throws ConfigurationException
     {
-        logger.trace("Audit logging is being enabled. Reloading AuditLogOptions.");
+        logger.debug("Audit logging is being enabled. Reloading AuditLogOptions.");
         IAuditLogger oldLogger = this.auditLogger;
+
         filter = AuditLogFilter.create(auditLogOptions);
 
         if (oldLogger != null && oldLogger.getClass().getSimpleName().equals(auditLogOptions.logger))
@@ -222,14 +244,14 @@ public class AuditLogManager
 
         this.auditLogger = getAuditLogger(auditLogOptions.logger);
 
-            /* Ensure oldLogger's stop() is called after we swap it with new logger otherwise,
-             * we might be calling log() on the stopped logger.
-             */
-
+        /* Ensure oldLogger's stop() is called after we swap it with new logger otherwise,
+         * we might be calling log() on the stopped logger.
+         */
         if (oldLogger != null)
         {
             oldLogger.stop();
         }
+        this.isAuditLogEnabled = true;
         logger.debug("Audit logging is enabled. Reloaded AuditLogOptions.");
     }
 }

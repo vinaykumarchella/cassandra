@@ -15,21 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.cassandra.audit;
 
-public abstract interface IAuditLogger
+/**
+ * No-Op implementation of AuditLogger class is used as a default audit logger when AuditLogger is disabled.
+ * This class helps avoiding any race conditions while enabling/ disabling audit logging via JMX
+ */
+public class NoOpAuditLogger implements IAuditLogger
 {
-    /**
-     * Logs AuditLogEntry to underlying implementation of IAdutitLogger. log() might be called after stop(),
-     * hence implementation of IAuditLogger:log() has to handle the same.
-     * @param logMessage
-     */
-    public abstract void log(AuditLogEntry logMessage);
+    @Override
+    public void log(AuditLogEntry logMessage)
+    {
 
-    /**
-     * Stop and cleanup any resources of IAuditLogger implementations. Please note that
-     * log() might be called even after stop() on AuditLogger.
-     */
-    public abstract void stop();
+    }
+
+    @Override
+    public void stop()
+    {
+
+    }
 }
