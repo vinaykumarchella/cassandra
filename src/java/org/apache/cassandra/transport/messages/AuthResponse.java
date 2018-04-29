@@ -83,7 +83,10 @@ public class AuthResponse extends Message.Request
                 AuthMetrics.instance.markSuccess();
                 if (auditLogEnabled)
                 {
-                    AuditLogEntry auditEntry = AuditLogEntry.getLogEntry("LOGIN SUCCESSFUL", queryState, AuditLogEntryType.LOGIN_SUCCESS);
+                    AuditLogEntry auditEntry = new AuditLogEntry.Builder(queryState.getClientState())
+                                               .setOperation("LOGIN SUCCESSFUL")
+                                               .setType(AuditLogEntryType.LOGIN_SUCCESS)
+                                               .build();
                     auditLogManager.log(auditEntry);
                 }
                 // authentication is complete, send a ready message to the client
@@ -99,7 +102,10 @@ public class AuthResponse extends Message.Request
             AuthMetrics.instance.markFailure();
             if (auditLogEnabled)
             {
-                AuditLogEntry auditEntry = AuditLogEntry.getLogEntry("LOGIN FAILURE", queryState, AuditLogEntryType.LOGIN_ERROR);
+                AuditLogEntry auditEntry = new AuditLogEntry.Builder(queryState.getClientState())
+                                           .setOperation("LOGIN FAILURE")
+                                           .setType(AuditLogEntryType.LOGIN_ERROR)
+                                           .build();
                 auditLogManager.log(auditEntry, e);
             }
             return ErrorMessage.fromException(e);

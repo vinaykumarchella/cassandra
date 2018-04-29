@@ -72,7 +72,6 @@ public enum AuditLogEntryType
     UNKNOWN("OTHER"),
     LOGIN_SUCCESS("AUTH");
 
-
     final String category;
 
     AuditLogEntryType(String category) {

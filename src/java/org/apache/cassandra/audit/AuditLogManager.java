@@ -19,9 +19,10 @@
 package org.apache.cassandra.audit;
 
 import java.nio.ByteBuffer;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.UUID;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
@@ -31,7 +32,6 @@ import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.statements.ParsedStatement;
-import org.apache.cassandra.db.fullquerylog.FullQueryLogger;
 import org.apache.cassandra.exceptions.AuthenticationException;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.exceptions.UnauthorizedException;
@@ -39,26 +39,40 @@ import org.apache.cassandra.schema.SchemaConstants;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.utils.FBUtilities;
 
+/**
+ * Central location for managing the logging of client/user-initated actions (like queries, log in commands, and so on).
+ *
+ * We can run multiple {@link IAuditLogger}s at the same time, including the standard audit logger and the fq logger.
+ */
 public class AuditLogManager
 {
     private static final Logger logger = LoggerFactory.getLogger(AuditLogManager.class);
     private static final AuditLogManager instance = new AuditLogManager();
 
-    private IAuditLogger auditLogger;
+    // FQL always writes to a BinLog, but it is a type of IAuditLogger
+    private final FullQueryLogger fullQueryLogger;
+
+    // auditLogger can write anywhere, as it's pluggable (logback, BinLog, DiagnosticEvents, etc ...)
+    private volatile IAuditLogger auditLogger;
+
     private volatile AuditLogFilter filter;
-    private volatile boolean isAuditLogEnabled = false;
+    private volatile boolean isAuditLogEnabled;
+
     private AuditLogManager()
     {
+        fullQueryLogger = new FullQueryLogger();
+
         if (DatabaseDescriptor.getAuditLoggingOptions().enabled)
         {
             logger.info("Audit logging is enabled.");
-            this.auditLogger = getAuditLogger(DatabaseDescriptor.getAuditLoggingOptions().logger);
-            this.isAuditLogEnabled = true;
+            auditLogger = getAuditLogger(DatabaseDescriptor.getAuditLoggingOptions().logger);
+            isAuditLogEnabled = true;
         }
         else
         {
             logger.info("Audit logging is disabled.");
-            this.isAuditLogEnabled = false;
+            isAuditLogEnabled = false;
+            auditLogger = new NoOpAuditLogger();
         }
 
         filter = AuditLogFilter.create(DatabaseDescriptor.getAuditLoggingOptions());
@@ -97,7 +111,7 @@ public class AuditLogManager
 
     private boolean isFQLEnabled()
     {
-        return FullQueryLogger.instance.enabled();
+        return fullQueryLogger.enabled();
     }
 
     private boolean isSystemKeyspace(String keyspaceName)
@@ -105,26 +119,21 @@ public class AuditLogManager
         return SchemaConstants.isLocalSystemKeyspace(keyspaceName);
     }
 
-    /*
-     * Logging overloads
-     */
     public void log(AuditLogEntry logEntry)
     {
+        if (logEntry == null)
+            return;
+
         if (isAuditingEnabled()
-            && (null != auditLogger)
-            && (null != logEntry)
-            && ((null == logEntry.getKeyspace()) || !isSystemKeyspace(logEntry.getKeyspace()))
-            && (!filter.isFiltered(logEntry)))
+            && (logEntry.getKeyspace() == null || !isSystemKeyspace(logEntry.getKeyspace()))
+            && !filter.isFiltered(logEntry))
         {
             auditLogger.log(logEntry);
         }
-    }
 
-    public void log(List<AuditLogEntry> auditLogEntries)
-    {
-        for (AuditLogEntry auditLogEntry : auditLogEntries)
+        if (isFQLEnabled())
         {
-            log(auditLogEntry);
+            fullQueryLogger.log(logEntry);
         }
     }
 
@@ -132,61 +141,39 @@ public class AuditLogManager
     {
         if ((logEntry != null) && (isAuditingEnabled()))
         {
-            AuditLogEntry auditEntry = new AuditLogEntry(logEntry);
+            AuditLogEntry.Builder builder = new AuditLogEntry.Builder(logEntry);
 
             if (e instanceof UnauthorizedException)
             {
-                auditEntry.setType(AuditLogEntryType.UNAUTHORIZED_ATTEMPT);
+                builder.setType(AuditLogEntryType.UNAUTHORIZED_ATTEMPT);
             }
             else if (e instanceof AuthenticationException)
             {
-                auditEntry.setType(AuditLogEntryType.LOGIN_ERROR);
+                builder.setType(AuditLogEntryType.LOGIN_ERROR);
             }
             else
             {
-                auditEntry.setType(AuditLogEntryType.REQUEST_FAILURE);
+                builder.setType(AuditLogEntryType.REQUEST_FAILURE);
             }
-            auditEntry.appendToOperation(e.getMessage());
 
-            log(auditEntry);
-        }
-    }
+            builder.appendToOperation(e.getMessage());
 
-    public void log(List<AuditLogEntry> auditLogEntries, Exception e)
-    {
-        if (null != auditLogEntries)
-        {
-            for (AuditLogEntry logEntry : auditLogEntries)
-            {
-                log(logEntry, e);
-            }
-        }
-    }
-
-    public void log(CQLStatement statement, String query, QueryOptions options, QueryState state, long queryStartNanoTime)
-    {
-        /**
-         * We can run both the audit logger and the fq logger at the same time, hence this method ensures that it logs
-         * to both the channels at same time.
-         */
-        if (isAuditingEnabled())
-        {
-            AuditLogEntry auditEntry = AuditLogEntry.getLogEntry(statement, query, state, options);
-            this.log(auditEntry);
-        }
-
-        if (isFQLEnabled())
-        {
-            long fqlTime = System.currentTimeMillis() - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - queryStartNanoTime);
-            FullQueryLogger.instance.logQuery(query, options, fqlTime);
+            log(builder.build());
         }
     }
 
     public void logBatch(String batchTypeName, List<Object> queryOrIdList, List<List<ByteBuffer>> values, List<ParsedStatement.Prepared> prepared, QueryOptions options, QueryState state, long queryStartNanoTime)
     {
+        if (!(isAuditingEnabled() || isFQLEnabled()))
+            return;
+
         if (isAuditingEnabled())
         {
-            log(AuditLogEntry.getLogEntriesForBatch(queryOrIdList, prepared, state, options));
+            List<AuditLogEntry> entries = buildEntriesForBatch(queryOrIdList, prepared, state, options);
+            for (AuditLogEntry auditLogEntry : entries)
+            {
+                log(auditLogEntry);
+            }
         }
 
         if (isFQLEnabled())
@@ -196,8 +183,37 @@ public class AuditLogManager
             {
                 queryStrings.add(prepStatment.rawCQLStatement);
             }
-            FullQueryLogger.instance.logBatch(batchTypeName, queryStrings, values, options, queryStartNanoTime);
+            fullQueryLogger.logBatch(batchTypeName, queryStrings, values, options, queryStartNanoTime);
         }
+    }
+
+    private static List<AuditLogEntry> buildEntriesForBatch(List<Object> queryOrIdList, List<ParsedStatement.Prepared> prepared, QueryState state, QueryOptions options)
+    {
+        List<AuditLogEntry> auditLogEntries = new ArrayList<>(queryOrIdList.size() + 1);
+        UUID batchId = UUID.randomUUID();
+        String queryString = String.format("BatchId:[%s] - BATCH of [%d] statements", batchId, queryOrIdList.size());
+        AuditLogEntry entry = new AuditLogEntry.Builder(state.getClientState())
+                              .setOperation(queryString)
+                              .setOptions(options)
+                              .setBatch(batchId)
+                              .build();
+        auditLogEntries.add(entry);
+
+        for (int i = 0; i < queryOrIdList.size(); i++)
+        {
+            CQLStatement statement = prepared.get(i).statement;
+            entry = new AuditLogEntry.Builder(state.getClientState())
+                    .setType(statement.getAuditLogContext().auditLogEntryType)
+                    .setOperation(prepared.get(i).rawCQLStatement)
+                    .setScope(statement)
+                    .setKeyspace(state, statement)
+                    .setOptions(options)
+                    .setBatch(batchId)
+                    .build();
+            auditLogEntries.add(entry);
+        }
+
+        return auditLogEntries;
     }
 
     /**
@@ -215,11 +231,11 @@ public class AuditLogManager
              */
 
             this.isAuditLogEnabled = false;
-            IAuditLogger oldLogger = this.auditLogger;
+            IAuditLogger oldLogger = auditLogger;
             /*
              * Avoid race conditions by passing NoOpAuditLogger while disabling auditlog via nodetool
              */
-            this.auditLogger = getAuditLogger("NoOpAuditLogger");
+            auditLogger = new NoOpAuditLogger();
             oldLogger.stop();
         }
     }
@@ -232,7 +248,7 @@ public class AuditLogManager
     public synchronized void enableAuditLog(AuditLogOptions auditLogOptions) throws ConfigurationException
     {
         logger.debug("Audit logging is being enabled. Reloading AuditLogOptions.");
-        IAuditLogger oldLogger = this.auditLogger;
+        IAuditLogger oldLogger = auditLogger;
 
         filter = AuditLogFilter.create(auditLogOptions);
 
@@ -242,7 +258,7 @@ public class AuditLogManager
             return;
         }
 
-        this.auditLogger = getAuditLogger(auditLogOptions.logger);
+        auditLogger = getAuditLogger(auditLogOptions.logger);
 
         /* Ensure oldLogger's stop() is called after we swap it with new logger otherwise,
          * we might be calling log() on the stopped logger.
@@ -253,5 +269,28 @@ public class AuditLogManager
         }
         this.isAuditLogEnabled = true;
         logger.debug("Audit logging is enabled. Reloaded AuditLogOptions.");
+    }
+
+    public void configureFQL(Path path, String rollCycle, boolean blocking, int maxQueueWeight, long maxLogSize)
+    {
+        fullQueryLogger.configure(path, rollCycle, blocking, maxQueueWeight, maxLogSize);
+    }
+
+    public void resetFQL(String fullQueryLogPath)
+    {
+        fullQueryLogger.reset(fullQueryLogPath);
+    }
+
+    public void disableFQL()
+    {
+        fullQueryLogger.stop();
+    }
+
+    /**
+     * ONLY FOR TESTING
+     */
+    FullQueryLogger getFullQueryLogger()
+    {
+        return fullQueryLogger;
     }
 }

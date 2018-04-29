@@ -120,8 +120,13 @@ public class PrepareMessage extends Message.Request
             if (auditLogEnabled)
             {
                 ParsedStatement.Prepared parsedStmt = QueryProcessor.parseStatement(query, state.getClientState());
-                AuditLogEntry auditEntry = AuditLogEntry.getLogEntry(parsedStmt.statement, query, state, AuditLogEntryType.PREPARE_STATEMENT);
-                auditLogManager.log(auditEntry);
+                AuditLogEntry auditLogEntry = new AuditLogEntry.Builder(state.getClientState())
+                                              .setOperation(query)
+                                              .setType(AuditLogEntryType.PREPARE_STATEMENT)
+                                              .setScope(parsedStmt.statement)
+                                              .setKeyspace(keyspace)
+                                              .build();
+                auditLogManager.log(auditLogEntry);
             }
 
             if (tracingId != null)
@@ -133,10 +138,12 @@ public class PrepareMessage extends Message.Request
         {
             if (auditLogEnabled)
             {
-                AuditLogEntry auditEntry = AuditLogEntry
-                                           .getLogEntry(query, state, AuditLogEntryType.PREPARE_STATEMENT)
-                                           .setKeyspace(keyspace);
-                auditLogManager.log(auditEntry, e);
+                AuditLogEntry auditLogEntry = new AuditLogEntry.Builder(state.getClientState())
+                                              .setOperation(query)
+                                              .setKeyspace(keyspace)
+                                              .setType(AuditLogEntryType.PREPARE_STATEMENT)
+                                              .build();
+                auditLogManager.log(auditLogEntry, e);
             }
             JVMStabilityInspector.inspectThrowable(e);
             return ErrorMessage.fromException(e);

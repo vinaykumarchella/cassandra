@@ -23,40 +23,34 @@ import com.google.common.primitives.Ints;
 
 import net.openhft.chronicle.wire.WireOut;
 import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.db.fullquerylog.FullQueryLogger;
 import org.apache.cassandra.utils.ObjectSizes;
 import org.apache.cassandra.utils.binlog.BinLog;
 import org.apache.cassandra.utils.concurrent.WeightedQueue;
 
-public class BinAuditLogger extends FullQueryLogger implements IAuditLogger
+public class BinAuditLogger extends BinLogAuditLogger implements IAuditLogger
 {
     public BinAuditLogger()
     {
-        this.configure(Paths.get(DatabaseDescriptor.getAuditLoggingOptions().audit_logs_dir),
-                       DatabaseDescriptor.getAuditLoggingOptions().roll_cycle,
-                       DatabaseDescriptor.getAuditLoggingOptions().block,
-                       DatabaseDescriptor.getAuditLoggingOptions().max_queue_weight,
-                       DatabaseDescriptor.getAuditLoggingOptions().max_log_size,
-                       false);
+        // due to the way that IAuditLogger instance are created in AuditLogManager, via reflection, we can't assume
+        // the manager will call configure() (it won't). thus, we have to call it here from the constructor.
+        configure(Paths.get(DatabaseDescriptor.getAuditLoggingOptions().audit_logs_dir),
+                  DatabaseDescriptor.getAuditLoggingOptions().roll_cycle,
+                  DatabaseDescriptor.getAuditLoggingOptions().block,
+                  DatabaseDescriptor.getAuditLoggingOptions().max_queue_weight,
+                  DatabaseDescriptor.getAuditLoggingOptions().max_log_size,
+                  false);
     }
 
     @Override
-    public void log(AuditLogEntry logMessage)
-    {
-        if (logMessage != null)
-        {
-            log(logMessage.toString());
-        }
-    }
-
-    public void log(String message)
+    public void log(AuditLogEntry auditLogEntry)
     {
         BinLog binLog = this.binLog;
-        if (binLog == null)
+        if (binLog == null || auditLogEntry == null)
         {
             return;
         }
-        super.logRecord(new WeighableMarshallableMessage(message), binLog);
+
+        super.logRecord(new WeighableMarshallableMessage(auditLogEntry.getLogString()), binLog);
     }
 
     static class WeighableMarshallableMessage extends BinLog.ReleaseableWriteMarshallable implements WeightedQueue.Weighable

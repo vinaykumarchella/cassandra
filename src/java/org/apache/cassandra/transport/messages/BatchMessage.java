@@ -242,9 +242,12 @@ public class BatchMessage extends Message.Request
         {
             if (auditLogEnabled)
             {
-                AuditLogEntry event = AuditLogEntry.getLogEntry(getAuditString(), state, this.options);
-                event.setType(AuditLogEntryType.BATCH);
-                auditLogManager.log(event, e);
+                AuditLogEntry entry = new AuditLogEntry.Builder(state.getClientState())
+                                      .setOperation(getAuditString())
+                                      .setOptions(options)
+                                      .setType(AuditLogEntryType.BATCH)
+                                      .build();
+                auditLogManager.log(entry, e);
             }
 
             JVMStabilityInspector.inspectThrowable(e);

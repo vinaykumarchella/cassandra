@@ -18,11 +18,14 @@
 package org.apache.cassandra.transport.messages;
 
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableMap;
 
 import io.netty.buffer.ByteBuf;
 import org.apache.cassandra.audit.AuditLogEntry;
+import org.apache.cassandra.audit.AuditLogEntryType;
+import org.apache.cassandra.audit.AuditLogManager;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.statements.ParsedStatement;
@@ -120,8 +123,18 @@ public class QueryMessage extends Message.Request
 
             if (isLoggingEnabled)
             {
-                ParsedStatement.Prepared parsedStmt = QueryProcessor.parseStatement(query, state.getClientState());
-                auditLogManager.log(parsedStmt.statement, query, options, state, queryStartNanoTime);
+                ParsedStatement.Prepared parsedStatement = QueryProcessor.parseStatement(query, state.getClientState());
+                long fqlTime = System.currentTimeMillis() - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - queryStartNanoTime);
+                AuditLogEntry auditEntry = new AuditLogEntry.Builder(state.getClientState())
+                                           .setType(parsedStatement.statement.getAuditLogContext().auditLogEntryType)
+                                           .setOperation(query)
+                                           .setScope(parsedStatement.statement)
+                                           .setKeyspace(state, parsedStatement.statement)
+                                           .setOptions(options)
+                                           .setTimestamp(fqlTime)
+                                           .build();
+                AuditLogManager.getInstance().log(auditEntry);
+
             }
 
             if (options.skipMetadata() && response instanceof ResultMessage.Rows)
@@ -136,8 +149,11 @@ public class QueryMessage extends Message.Request
         {
             if (auditLogEnabled)
             {
-                AuditLogEntry auditEntry = AuditLogEntry.getLogEntry(query, state, options);
-                auditLogManager.log(auditEntry, e);
+                AuditLogEntry auditLogEntry = new AuditLogEntry.Builder(state.getClientState())
+                                              .setOperation(query)
+                                              .setOptions(options)
+                                              .build();
+                auditLogManager.log(auditLogEntry, e);
             }
             JVMStabilityInspector.inspectThrowable(e);
             if (!((e instanceof RequestValidationException) || (e instanceof RequestExecutionException)))

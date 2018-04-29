@@ -18,16 +18,15 @@
 package org.apache.cassandra.audit;
 
 import java.net.InetSocketAddress;
-import java.util.List;
+import java.net.UnknownHostException;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
-import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 
 import org.apache.cassandra.auth.AuthenticatedUser;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.QueryOptions;
-import org.apache.cassandra.cql3.statements.ParsedStatement;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
@@ -35,60 +34,39 @@ import org.apache.cassandra.utils.FBUtilities;
 
 public class AuditLogEntry
 {
-    private static final InetSocketAddress DEFAULT_SOURCE = new InetSocketAddress("0.0.0.0", 0);
-
     private final InetAddressAndPort host = FBUtilities.getBroadcastAddressAndPort();
-    private final String source, user;
-    private final int srcPort;
-    private long timestamp;
-    private AuditLogEntryType type;
-    private UUID batch;
-    private String keyspace, scope, operation = "";
+    private final InetAddressAndPort source;
+    private final String user;
+    private final long timestamp;
+    private final AuditLogEntryType type;
+    private final UUID batch;
+    private final String keyspace;
+    private final String scope;
+    private final String operation;
+    private final QueryOptions options;
 
-    public AuditLogEntry(String source, int srcPort, String user)
+    private AuditLogEntry(AuditLogEntryType type, InetAddressAndPort source, String user, long timestamp, UUID batch, String keyspace, String scope, String operation, QueryOptions options)
     {
+        this.type = type;
         this.source = source;
         this.user = user;
-        this.srcPort = srcPort;
-        timestamp = System.currentTimeMillis();
+        this.timestamp = timestamp;
+        this.batch = batch;
+        this.keyspace = keyspace;
+        this.scope = scope;
+        this.operation = operation;
+        this.options = options;
     }
 
-    public AuditLogEntry(AuditLogEntryType type, String user, String source, int srcPort)
+    String getLogString()
     {
-        this(source, srcPort, user);
-        this.type = type;
-    }
-
-    public AuditLogEntry(AuditLogEntry auditLogEntry)
-    {
-        this(auditLogEntry.type, auditLogEntry.user, auditLogEntry.source, auditLogEntry.srcPort);
-        timestamp = auditLogEntry.timestamp;
-        keyspace = auditLogEntry.keyspace;
-        scope = auditLogEntry.scope;
-        batch = auditLogEntry.batch;
-        operation = auditLogEntry.operation;
-    }
-
-    public static AuditLogEntry getAuditEntry(ClientState clientState)
-    {
-        InetSocketAddress sourceSockAddr = getSource(clientState);
-
-        if (clientState != null && clientState.getUser() != null)
-        {
-            return new AuditLogEntry(sourceSockAddr.getAddress().toString(), sourceSockAddr.getPort(), clientState.getUser().getName());
-        }
-        return new AuditLogEntry(sourceSockAddr.getAddress().toString(), sourceSockAddr.getPort(), AuthenticatedUser.SYSTEM_USER.getName());
-    }
-
-    public String toString()
-    {
-        StringBuilder builder = new StringBuilder(64);
+        StringBuilder builder = new StringBuilder(100);
         builder.append("user:").append(user)
                .append("|host:").append(host)
-               .append("|source:").append(source);
-        if (srcPort > 0)
+               .append("|source:").append(source.address);
+        if (source.port > 0)
         {
-            builder.append("|port:").append(srcPort);
+            builder.append("|port:").append(source.port);
         }
 
         builder.append("|timestamp:").append(timestamp)
@@ -114,54 +92,24 @@ public class AuditLogEntry
         return builder.toString();
     }
 
+    public InetAddressAndPort getHost()
+    {
+        return host;
+    }
+
+    public InetAddressAndPort getSource()
+    {
+        return source;
+    }
+
     public String getUser()
     {
-        return this.user;
+        return user;
     }
 
-    public AuditLogEntry setTimestamp(long timestamp)
+    public long getTimestamp()
     {
-        this.timestamp = timestamp;
-        return this;
-    }
-
-    public AuditLogEntry setBatch(UUID batch)
-    {
-        this.batch = batch;
-        return this;
-    }
-
-    public String getOperation()
-    {
-        return operation;
-    }
-
-    public AuditLogEntry setOperation(String operation)
-    {
-        this.operation = operation;
-        return this;
-    }
-
-    public String getKeyspace()
-    {
-        return keyspace;
-    }
-
-    public AuditLogEntry setKeyspace(String keyspace)
-    {
-        this.keyspace = keyspace;
-        return this;
-    }
-
-    public String getScope()
-    {
-        return scope;
-    }
-
-    public AuditLogEntry setScope(String scope)
-    {
-        this.scope = scope;
-        return this;
+        return timestamp;
     }
 
     public AuditLogEntryType getType()
@@ -169,118 +117,173 @@ public class AuditLogEntry
         return type;
     }
 
-    public AuditLogEntry setType(AuditLogEntryType type)
+    public UUID getBatch()
     {
-        this.type = type;
-        return this;
+        return batch;
     }
 
-    public void appendToOperation(String str)
+    public String getKeyspace()
     {
-        if (StringUtils.isNotBlank(str))
+        return keyspace;
+    }
+
+    public String getScope()
+    {
+        return scope;
+    }
+
+    public String getOperation()
+    {
+        return operation;
+    }
+
+    public QueryOptions getOptions()
+    {
+        return options;
+    }
+
+    public static class Builder
+    {
+        private static final InetAddressAndPort DEFAULT_SOURCE;
+
+        // thanks, java, for making this ugly
+        static
         {
-            this.operation = this.operation.concat("; ").concat(str);
-        }
-    }
+            try
+            {
+                DEFAULT_SOURCE = InetAddressAndPort.getByNameOverrideDefaults("0.0.0.0", 0);
+            }
+            catch (UnknownHostException e)
+            {
 
-    private static InetSocketAddress getSource(ClientState state)
-    {
-        if (state != null && state.getRemoteAddress() != null)
-        {
-            return state.getRemoteAddress();
-        }
-        return DEFAULT_SOURCE;
-    }
-
-    public static AuditLogEntry getLogEntry(CQLStatement statement, String queryString, QueryState queryState, AuditLogEntryType type)
-    {
-        AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
-
-        entry.setKeyspace(getKeyspace(statement, queryState))
-             .setScope(getColumnFamily(statement))
-             .setOperation(queryString)
-             .setType(type);
-
-        return entry;
-    }
-
-    /**
-     * Gets the AuditLogEntry entry as per the params given. Ensure that type is set by the caller.
-     */
-    public static AuditLogEntry getLogEntry(String operation, QueryState queryState, AuditLogEntryType type)
-    {
-        AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
-        entry.setKeyspace(queryState.getClientState().getRawKeyspace())
-             .setOperation(operation)
-             .setType(type);
-
-        return entry;
-    }
-
-    /**
-     * Native protocol/ CQL helper methods for Audit Logging
-     */
-    public static AuditLogEntry getLogEntry(CQLStatement statement, String queryString, QueryState queryState)
-    {
-        return getLogEntry(statement, queryString, queryState, statement.getAuditLogContext().auditLogEntryType);
-    }
-
-    public static AuditLogEntry getLogEntry(CQLStatement statement, String queryString, QueryState queryState, QueryOptions queryOptions)
-    {
-        return getLogEntry(statement, queryString, queryState);
-    }
-
-    /**
-     * Gets the AuditLogEntry entry as per the params given. Ensure that type is set by the caller.
-     */
-    public static AuditLogEntry getLogEntry(String queryString, QueryState queryState, QueryOptions queryOptions)
-    {
-        AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
-        entry.setKeyspace(queryState.getClientState().getRawKeyspace()).setOperation(queryString);
-        return entry;
-    }
-
-    /**
-     * Gets the AuditLogEntry entry as per the params given. Ensure that type is set by the caller.
-     */
-    public static AuditLogEntry getLogEntry(String queryString, QueryState queryState, QueryOptions queryOptions, UUID batchId)
-    {
-        AuditLogEntry entry = AuditLogEntry.getAuditEntry(queryState.getClientState());
-
-        entry.setKeyspace(queryState.getClientState().getRawKeyspace())
-             .setBatch(batchId)
-             .setType(AuditLogEntryType.BATCH)
-             .setOperation(queryString);
-        return entry;
-    }
-
-    private static AuditLogEntry getLogEntry(CQLStatement statement, String rawCQLStatement, QueryState queryState, QueryOptions queryOptions, UUID batchId)
-    {
-        return getLogEntry(statement, rawCQLStatement, queryState, queryOptions).setBatch(batchId);
-    }
-
-    public static List<AuditLogEntry> getLogEntriesForBatch(List<Object> queryOrIdList, List<ParsedStatement.Prepared> prepared, QueryState state, QueryOptions options)
-    {
-        List<AuditLogEntry> auditLogEntries = Lists.newArrayList();
-        UUID batchId = UUID.randomUUID();
-        String queryString = String.format("BatchId:[%s] - BATCH of [%d] statements", batchId, queryOrIdList.size());
-        auditLogEntries.add(getLogEntry(queryString, state, options, batchId));
-
-        for (int i = 0; i < queryOrIdList.size(); i++)
-        {
-            auditLogEntries.add(getLogEntry(prepared.get(i).statement, prepared.get(i).rawCQLStatement, state, options, batchId));
+                throw new RuntimeException("failed to create default source address", e);
+            }
         }
 
-        return auditLogEntries;
-    }
+        private static final String DEFAULT_OPERATION = StringUtils.EMPTY;
 
-    private static String getKeyspace(CQLStatement stmt, QueryState queryState)
-    {
-        return stmt.getAuditLogContext().keyspace != null ? stmt.getAuditLogContext().keyspace : queryState.getClientState().getRawKeyspace();
-    }
+        private AuditLogEntryType type;
+        private InetAddressAndPort source;
+        private String user;
+        private long timestamp;
+        private UUID batch;
+        private String keyspace;
+        private String scope;
+        private String operation;
+        private QueryOptions options;
 
-    private static String getColumnFamily(CQLStatement stmt)
-    {
-        return stmt.getAuditLogContext().scope;
+        public Builder(ClientState clientState)
+        {
+            if (clientState != null)
+            {
+                if (clientState.getRemoteAddress() != null)
+                {
+                    InetSocketAddress addr = clientState.getRemoteAddress();
+                    source = InetAddressAndPort.getByAddressOverrideDefaults(addr.getAddress(), addr.getPort());
+                }
+
+                if (clientState.getUser() != null)
+                {
+                    user = clientState.getUser().getName();
+                }
+            }
+            else
+            {
+                source = DEFAULT_SOURCE;
+                user = AuthenticatedUser.SYSTEM_USER.getName();
+            }
+        }
+
+        public Builder(AuditLogEntry entry)
+        {
+            type = entry.type;
+            source = entry.source;
+            user = entry.user;
+            timestamp = entry.timestamp;
+            batch = entry.batch;
+            keyspace = entry.keyspace;
+            scope = entry.scope;
+            operation = entry.operation;
+            options = entry.options;
+        }
+
+        public Builder setType(AuditLogEntryType type)
+        {
+            this.type = type;
+            return this;
+        }
+
+        public Builder(AuditLogEntryType type)
+        {
+            this.type = type;
+            operation = DEFAULT_OPERATION;
+        }
+
+        public Builder setUser(String user)
+        {
+            this.user = user;
+            return this;
+        }
+
+        public Builder setTimestamp(long timestamp)
+        {
+            this.timestamp = timestamp;
+            return this;
+        }
+
+        public Builder setBatch(UUID batch)
+        {
+            this.batch = batch;
+            return this;
+        }
+
+        public Builder setKeyspace(QueryState queryState, @Nullable CQLStatement statement)
+        {
+            keyspace = statement != null && statement.getAuditLogContext().keyspace != null
+                       ? statement.getAuditLogContext().keyspace
+                       : queryState.getClientState().getRawKeyspace();
+            return this;
+        }
+
+        public Builder setKeyspace(String keyspace)
+        {
+            this.keyspace = keyspace;
+            return this;
+        }
+
+        public Builder setScope(CQLStatement statement)
+        {
+            this.scope = statement.getAuditLogContext().scope;
+            return this;
+        }
+
+        public Builder setOperation(String operation)
+        {
+            this.operation = operation;
+            return this;
+        }
+
+        public void appendToOperation(String str)
+        {
+            if (StringUtils.isNotBlank(str))
+            {
+                if (operation.isEmpty())
+                    operation = str;
+                else
+                    operation = operation.concat("; ").concat(str);
+            }
+        }
+
+        public Builder setOptions(QueryOptions options)
+        {
+            this.options = options;
+            return this;
+        }
+
+        public AuditLogEntry build()
+        {
+            return new AuditLogEntry(type, source, user, timestamp, batch, keyspace, scope, operation, options);
+        }
     }
 }
+

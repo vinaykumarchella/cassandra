@@ -28,15 +28,30 @@ public class FileAuditLogger implements IAuditLogger
 {
     protected static final Logger logger = LoggerFactory.getLogger(FileAuditLogger.class);
 
-    @Override
-    public void log(AuditLogEntry logMessage)
+    private volatile boolean enabled;
+
+    public FileAuditLogger()
     {
-        logger.info(logMessage.toString());
+        enabled = true;
+    }
+
+    @Override
+    public boolean enabled()
+    {
+        return enabled;
+    }
+
+    @Override
+    public void log(AuditLogEntry auditLogEntry)
+    {
+        // don't bother with the volatile read of enabled here. just go ahead and log, other components
+        // will check the enbaled field.
+        logger.info(auditLogEntry.getLogString());
     }
 
     @Override
     public void stop()
     {
-
+        enabled = false;
     }
 }

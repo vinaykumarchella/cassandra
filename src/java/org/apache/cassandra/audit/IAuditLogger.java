@@ -18,18 +18,19 @@
 
 package org.apache.cassandra.audit;
 
-public abstract interface IAuditLogger
+public interface IAuditLogger
 {
+    boolean enabled();
+
     /**
      * Logs AuditLogEntry to underlying implementation of IAdutitLogger. log() might be called after stop(),
      * hence implementation of IAuditLogger:log() has to handle the same.
-     * @param logMessage
      */
-    public abstract void log(AuditLogEntry logMessage);
+    void log(AuditLogEntry auditLogEntry);
 
     /**
      * Stop and cleanup any resources of IAuditLogger implementations. Please note that
      * log() might be called even after stop() on AuditLogger.
      */
-    public abstract void stop();
+    void stop();
 }

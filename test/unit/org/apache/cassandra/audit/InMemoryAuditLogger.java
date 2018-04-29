@@ -34,9 +34,14 @@ public class InMemoryAuditLogger implements IAuditLogger
         return instance;
     }
 
+    @Override
+    public boolean enabled()
+    {
+        return true;
+    }
+
     public void log(AuditLogEntry logMessage)
     {
-
         inMemQueue.offer(logMessage);
     }
 

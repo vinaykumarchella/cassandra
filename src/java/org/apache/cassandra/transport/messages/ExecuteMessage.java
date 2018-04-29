@@ -18,11 +18,13 @@
 package org.apache.cassandra.transport.messages;
 
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableMap;
 
 import io.netty.buffer.ByteBuf;
 import org.apache.cassandra.audit.AuditLogEntry;
+import org.apache.cassandra.audit.AuditLogManager;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.ColumnSpecification;
 import org.apache.cassandra.cql3.QueryHandler;
@@ -168,7 +170,16 @@ public class ExecuteMessage extends Message.Request
 
             if (isLoggingEnabled)
             {
-                auditLogManager.log(statement, prepared.rawCQLStatement, options, state, queryStartNanoTime);
+                long fqlTime = System.currentTimeMillis() - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - queryStartNanoTime);
+                AuditLogEntry auditEntry = new AuditLogEntry.Builder(state.getClientState())
+                                           .setType(statement.getAuditLogContext().auditLogEntryType)
+                                           .setOperation(prepared.rawCQLStatement)
+                                           .setScope(statement)
+                                           .setKeyspace(state, statement)
+                                           .setOptions(options)
+                                           .setTimestamp(fqlTime)
+                                           .build();
+                AuditLogManager.getInstance().log(auditEntry);
             }
 
             if (response instanceof ResultMessage.Rows)
@@ -212,14 +223,26 @@ public class ExecuteMessage extends Message.Request
             {
                 if (e instanceof PreparedQueryNotFoundException)
                 {
-                    AuditLogEntry auditLogEntry = AuditLogEntry.getLogEntry(toString(), state, this.options);
+                    AuditLogEntry auditLogEntry = new AuditLogEntry.Builder(state.getClientState())
+                                                  .setOperation(toString())
+                                                  .setOptions(options)
+                                                  .build();
                     auditLogManager.log(auditLogEntry, e);
                 }
                 else
                 {
                     ParsedStatement.Prepared prepared = ClientState.getCQLQueryHandler().getPrepared(statementId);
-                    AuditLogEntry auditLogEntry = AuditLogEntry.getLogEntry(prepared.statement, prepared.rawCQLStatement, state, options);
-                    auditLogManager.log(auditLogEntry, e);
+                    if (prepared != null)
+                    {
+                        AuditLogEntry auditLogEntry = new AuditLogEntry.Builder(state.getClientState())
+                                                      .setOperation(toString())
+                                                      .setType(prepared.statement.getAuditLogContext().auditLogEntryType)
+                                                      .setScope(prepared.statement)
+                                                      .setKeyspace(state, prepared.statement)
+                                                      .setOptions(options)
+                                                      .build();
+                        auditLogManager.log(auditLogEntry, e);
+                    }
                 }
             }
 
