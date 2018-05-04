@@ -24,61 +24,62 @@ public enum AuditLogEntryType
      * CQL Audit Log Entry Types
      */
 
-    SELECT("QUERY"),
-    UPDATE("DML"),
-    DELETE("DML"),
-    TRUNCATE("DDL"),
-    CREATE_KEYSPACE("DDL"),
-    ALTER_KEYSPACE("DDL"),
-    DROP_KEYSPACE("DDL"),
-    CREATE_TABLE("DDL"),
-    DROP_TABLE("DDL"),
-    PREPARE_STATEMENT("DML"),
-    DROP_TRIGGER("DDL"),
-    LIST_USERS("DCL"),
-    CREATE_INDEX("DDL"),
-    DROP_INDEX("DDL"),
-    GRANT("DCL"),
-    REVOKE("DCL"),
-    CREATE_TYPE("DDL"),
-    DROP_AGGREGATE("DDL"),
-    ALTER_VIEW("DDL"),
-    CREATE_VIEW("DDL"),
-    DROP_ROLE("DCL"),
-    CREATE_FUNCTION("DDL"),
-    ALTER_TABLE("DDL"),
-    BATCH("DML"),
-    CREATE_AGGREGATE("DDL"),
-    AUTH("AUTH"),
-    DROP_VIEW("DDL"),
-    DROP_TYPE("DDL"),
-    DROP_FUNCTION("DDL"),
-    ALTER_ROLE("DCL"),
-    CREATE_TRIGGER("DDL"),
-    LIST_ROLES("DCL"),
-    LIST_PERMISSIONS("DCL"),
-    ALTER_TYPE("DDL"),
-    CREATE_ROLE("DCL"),
-    USE_KEYSPACE("OTHER"),
+    SELECT(AuditLogEntryCategory.QUERY),
+    UPDATE(AuditLogEntryCategory.DML),
+    DELETE(AuditLogEntryCategory.DML),
+    TRUNCATE(AuditLogEntryCategory.DDL),
+    CREATE_KEYSPACE(AuditLogEntryCategory.DDL),
+    ALTER_KEYSPACE(AuditLogEntryCategory.DDL),
+    DROP_KEYSPACE(AuditLogEntryCategory.DDL),
+    CREATE_TABLE(AuditLogEntryCategory.DDL),
+    DROP_TABLE(AuditLogEntryCategory.DDL),
+    PREPARE_STATEMENT(AuditLogEntryCategory.DML),
+    DROP_TRIGGER(AuditLogEntryCategory.DDL),
+    LIST_USERS(AuditLogEntryCategory.DCL),
+    CREATE_INDEX(AuditLogEntryCategory.DDL),
+    DROP_INDEX(AuditLogEntryCategory.DDL),
+    GRANT(AuditLogEntryCategory.DCL),
+    REVOKE(AuditLogEntryCategory.DCL),
+    CREATE_TYPE(AuditLogEntryCategory.DDL),
+    DROP_AGGREGATE(AuditLogEntryCategory.DDL),
+    ALTER_VIEW(AuditLogEntryCategory.DDL),
+    CREATE_VIEW(AuditLogEntryCategory.DDL),
+    DROP_ROLE(AuditLogEntryCategory.DCL),
+    CREATE_FUNCTION(AuditLogEntryCategory.DDL),
+    ALTER_TABLE(AuditLogEntryCategory.DDL),
+    BATCH(AuditLogEntryCategory.DML),
+    CREATE_AGGREGATE(AuditLogEntryCategory.DDL),
+    AUTH(AuditLogEntryCategory.AUTH),
+    DROP_VIEW(AuditLogEntryCategory.DDL),
+    DROP_TYPE(AuditLogEntryCategory.DDL),
+    DROP_FUNCTION(AuditLogEntryCategory.DDL),
+    ALTER_ROLE(AuditLogEntryCategory.DCL),
+    CREATE_TRIGGER(AuditLogEntryCategory.DDL),
+    LIST_ROLES(AuditLogEntryCategory.DCL),
+    LIST_PERMISSIONS(AuditLogEntryCategory.DCL),
+    ALTER_TYPE(AuditLogEntryCategory.DDL),
+    CREATE_ROLE(AuditLogEntryCategory.DCL),
+    USE_KEYSPACE(AuditLogEntryCategory.OTHER),
+
 
 
     /*
      * Common Audit Log Entry Types
      */
 
-    REQUEST_FAILURE("OTHER"),
-    LOGIN_ERROR("AUTH"),
-    UNAUTHORIZED_ATTEMPT("AUTH"),
-    UNKNOWN("OTHER"),
-    LOGIN_SUCCESS("AUTH");
+    REQUEST_FAILURE(AuditLogEntryCategory.OTHER),
+    LOGIN_ERROR(AuditLogEntryCategory.AUTH),
+    UNAUTHORIZED_ATTEMPT(AuditLogEntryCategory.AUTH),
+    UNKNOWN(AuditLogEntryCategory.OTHER),
+    LOGIN_SUCCESS(AuditLogEntryCategory.AUTH);
 
-    final String category;
+    final AuditLogEntryCategory category;
 
-    AuditLogEntryType(String category) {
+    AuditLogEntryType(AuditLogEntryCategory category) {
         this.category = category;
     }
 
-    public String getCategory()
+    public AuditLogEntryCategory getCategory()
     {
         return this.category;
     }

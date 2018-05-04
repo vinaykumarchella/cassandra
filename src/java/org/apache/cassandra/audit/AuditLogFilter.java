@@ -108,7 +108,7 @@ public class AuditLogFilter
     boolean isFiltered(AuditLogEntry auditLogEntry)
     {
         return isFiltered(auditLogEntry.getKeyspace(), includedKeyspaces, excludedKeyspaces)
-               || isFiltered(auditLogEntry.getType().getCategory(), includedCategories, excludedCategories)
+               || isFiltered(auditLogEntry.getType().getCategory().toString(), includedCategories, excludedCategories)
                || isFiltered(auditLogEntry.getUser(), includedUsers, excludedUsers);
     }
 
