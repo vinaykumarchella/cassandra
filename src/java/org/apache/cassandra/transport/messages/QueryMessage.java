@@ -124,14 +124,12 @@ public class QueryMessage extends Message.Request
             if (isLoggingEnabled)
             {
                 ParsedStatement.Prepared parsedStatement = QueryProcessor.parseStatement(query, state.getClientState());
-                long fqlTime = System.currentTimeMillis() - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - queryStartNanoTime);
-                AuditLogEntry auditEntry = new AuditLogEntry.Builder(state.getClientState())
+                AuditLogEntry auditEntry = new AuditLogEntry.Builder(state.getClientState(), queryStartNanoTime)
                                            .setType(parsedStatement.statement.getAuditLogContext().auditLogEntryType)
                                            .setOperation(query)
                                            .setScope(parsedStatement.statement)
                                            .setKeyspace(state, parsedStatement.statement)
                                            .setOptions(options)
-                                           .setTimestamp(fqlTime)
                                            .build();
                 AuditLogManager.getInstance().log(auditEntry);
 

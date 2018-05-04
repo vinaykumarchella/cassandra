@@ -42,8 +42,7 @@ import net.openhft.chronicle.queue.RollCycles;
 import net.openhft.chronicle.wire.ValueIn;
 import net.openhft.chronicle.wire.WireOut;
 import org.apache.cassandra.Util;
-import org.apache.cassandra.audit.AuditLogManager;
-import org.apache.cassandra.audit.FullQueryLogger;
+import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.audit.FullQueryLogger.WeighableMarshallableQuery;
 import org.apache.cassandra.audit.FullQueryLogger.WeighableMarshallableBatch;
@@ -55,7 +54,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class FullQueryLoggerTest
+public class FullQueryLoggerTest extends CQLTester
 {
     private static Path tempDir;
 

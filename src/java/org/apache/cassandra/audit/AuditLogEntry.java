@@ -20,6 +20,7 @@ package org.apache.cassandra.audit;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
 import org.apache.commons.lang3.StringUtils;
@@ -186,12 +187,20 @@ public class AuditLogEntry
                 {
                     user = clientState.getUser().getName();
                 }
+                keyspace = clientState.getRawKeyspace();
             }
             else
             {
                 source = DEFAULT_SOURCE;
                 user = AuthenticatedUser.SYSTEM_USER.getName();
             }
+        }
+
+        public Builder(ClientState clientState, long queryStartNanoTime)
+        {
+            this(clientState);
+            long fqlTime = System.currentTimeMillis() - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - queryStartNanoTime);
+            timestamp = fqlTime;
         }
 
         public Builder(AuditLogEntry entry)
@@ -225,12 +234,6 @@ public class AuditLogEntry
             return this;
         }
 
-        public Builder setTimestamp(long timestamp)
-        {
-            this.timestamp = timestamp;
-            return this;
-        }
-
         public Builder setBatch(UUID batch)
         {
             this.batch = batch;
@@ -248,6 +251,12 @@ public class AuditLogEntry
         public Builder setKeyspace(String keyspace)
         {
             this.keyspace = keyspace;
+            return this;
+        }
+
+        public Builder setKeyspace(CQLStatement statement)
+        {
+            this.keyspace = statement.getAuditLogContext().keyspace;
             return this;
         }
 
@@ -282,6 +291,7 @@ public class AuditLogEntry
 
         public AuditLogEntry build()
         {
+            timestamp = timestamp > 0 ? timestamp : System.currentTimeMillis();
             return new AuditLogEntry(type, source, user, timestamp, batch, keyspace, scope, operation, options);
         }
     }

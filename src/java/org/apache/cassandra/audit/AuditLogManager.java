@@ -196,6 +196,7 @@ public class AuditLogManager
                               .setOperation(queryString)
                               .setOptions(options)
                               .setBatch(batchId)
+                              .setType(AuditLogEntryType.BATCH)
                               .build();
         auditLogEntries.add(entry);
 

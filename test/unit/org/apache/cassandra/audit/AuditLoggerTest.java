@@ -36,6 +36,7 @@ import org.apache.cassandra.service.StorageService;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 
@@ -525,6 +526,25 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
+    public void testCqlSelectQuerySyntaxError()
+    {
+        createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
+        String cql = "SELECT * FROM " + KEYSPACE + '.' + currentTable() + " LIMIT 2w";
+
+        try
+        {
+            Session session = sessionNet();
+            ResultSet rs = session.execute(cql);
+        }
+        catch (SyntaxError e)
+        {
+        }
+        AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
+        assertLogEntry(logEntry, cql);
+        assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
+    }
+
+    @Test
     public void testCqlPrepareQueryError()
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
@@ -657,12 +677,15 @@ public class AuditLoggerTest extends CQLTester
         }
         assertEquals(type, actual.getType());
         assertEquals(cql, actual.getOperation());
+        assertNotEquals(0,actual.getTimestamp());
+
     }
 
     private void assertLogEntry(AuditLogEntry logEntry, String cql)
     {
         assertNull(logEntry.getKeyspace());
         assertNull(logEntry.getScope());
+        assertNotEquals(0,logEntry.getTimestamp());
         assertEquals(AuditLogEntryType.REQUEST_FAILURE, logEntry.getType());
         if (null != cql && !cql.isEmpty())
         {

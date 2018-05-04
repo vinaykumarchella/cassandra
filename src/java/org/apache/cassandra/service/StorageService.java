@@ -5418,8 +5418,8 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
         logger.info("AuditLog is enabled with logger: [{}], included_keyspaces: [{}], excluded_keyspaces: [{}], " +
                     "included_categories: [{}], excluded_categories: [{}]," +
-                    "included_users: [{}], excluded_users: [{}],", loggerName, includedKeyspaces, excludedKeyspaces,
-                    includedCategories, excludedCategories, includedUsers, excludedUsers);
+                    "included_users: [{}], excluded_users: [{}],", loggerName, auditLogOptions.included_keyspaces, auditLogOptions.excluded_keyspaces,
+                    auditLogOptions.included_categories, auditLogOptions.excluded_categories, auditLogOptions.included_users, auditLogOptions.excluded_users);
 
     }
 

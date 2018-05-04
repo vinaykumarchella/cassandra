@@ -124,7 +124,7 @@ public class PrepareMessage extends Message.Request
                                               .setOperation(query)
                                               .setType(AuditLogEntryType.PREPARE_STATEMENT)
                                               .setScope(parsedStmt.statement)
-                                              .setKeyspace(keyspace)
+                                              .setKeyspace(parsedStmt.statement)
                                               .build();
                 auditLogManager.log(auditLogEntry);
             }

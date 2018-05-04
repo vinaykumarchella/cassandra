@@ -170,14 +170,12 @@ public class ExecuteMessage extends Message.Request
 
             if (isLoggingEnabled)
             {
-                long fqlTime = System.currentTimeMillis() - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - queryStartNanoTime);
-                AuditLogEntry auditEntry = new AuditLogEntry.Builder(state.getClientState())
+                AuditLogEntry auditEntry = new AuditLogEntry.Builder(state.getClientState(), queryStartNanoTime)
                                            .setType(statement.getAuditLogContext().auditLogEntryType)
                                            .setOperation(prepared.rawCQLStatement)
                                            .setScope(statement)
                                            .setKeyspace(state, statement)
                                            .setOptions(options)
-                                           .setTimestamp(fqlTime)
                                            .build();
                 AuditLogManager.getInstance().log(auditEntry);
             }
