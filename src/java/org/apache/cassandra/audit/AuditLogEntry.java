@@ -199,6 +199,9 @@ public class AuditLogEntry
         public Builder(ClientState clientState, long queryStartNanoTime)
         {
             this(clientState);
+            /*
+             * FQLTime is time in milliseconds since the epoch since the operation was invoked, this does not involve operation execution time
+             */
             long fqlTime = System.currentTimeMillis() - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - queryStartNanoTime);
             timestamp = fqlTime;
         }

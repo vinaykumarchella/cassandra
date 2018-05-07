@@ -181,7 +181,7 @@ public class AuditLoggerTest extends CQLTester
 
         AuditLogOptions options = new AuditLogOptions();
         options.excluded_categories = "QUERY";
-        options.included_categories = "QUERY,DML";
+        options.included_categories = "QUERY,DML,PREPARE";
         enableAuditLogOptions(options);
 
         //QUERY - Should be filtered, part of excluded categories,
@@ -619,7 +619,7 @@ public class AuditLoggerTest extends CQLTester
         return executeAndAssertWithPrepare(cql, exceuteType, false, bindValues);
     }
 
-    private ResultSet executeAndAssertWithPrepare(String cql, AuditLogEntryType exceuteType, boolean isTableNull, Object... bindValues) throws Throwable
+    private ResultSet executeAndAssertWithPrepare(String cql, AuditLogEntryType executeType, boolean isTableNull, Object... bindValues) throws Throwable
     {
         Session session = sessionNet();
 
@@ -630,7 +630,7 @@ public class AuditLoggerTest extends CQLTester
         assertLogEntry(cql, AuditLogEntryType.PREPARE_STATEMENT, logEntry1, isTableNull);
 
         AuditLogEntry logEntry2 = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
-        assertLogEntry(cql, exceuteType, logEntry2, isTableNull);
+        assertLogEntry(cql, executeType, logEntry2, isTableNull);
 
         assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
         return rs;

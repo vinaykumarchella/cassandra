@@ -33,7 +33,7 @@ public enum AuditLogEntryType
     DROP_KEYSPACE(AuditLogEntryCategory.DDL),
     CREATE_TABLE(AuditLogEntryCategory.DDL),
     DROP_TABLE(AuditLogEntryCategory.DDL),
-    PREPARE_STATEMENT(AuditLogEntryCategory.DML),
+    PREPARE_STATEMENT(AuditLogEntryCategory.PREPARE),
     DROP_TRIGGER(AuditLogEntryCategory.DDL),
     LIST_USERS(AuditLogEntryCategory.DCL),
     CREATE_INDEX(AuditLogEntryCategory.DDL),
@@ -49,7 +49,6 @@ public enum AuditLogEntryType
     ALTER_TABLE(AuditLogEntryCategory.DDL),
     BATCH(AuditLogEntryCategory.DML),
     CREATE_AGGREGATE(AuditLogEntryCategory.DDL),
-    AUTH(AuditLogEntryCategory.AUTH),
     DROP_VIEW(AuditLogEntryCategory.DDL),
     DROP_TYPE(AuditLogEntryCategory.DDL),
     DROP_FUNCTION(AuditLogEntryCategory.DDL),
@@ -67,10 +66,9 @@ public enum AuditLogEntryType
      * Common Audit Log Entry Types
      */
 
-    REQUEST_FAILURE(AuditLogEntryCategory.OTHER),
+    REQUEST_FAILURE(AuditLogEntryCategory.ERROR),
     LOGIN_ERROR(AuditLogEntryCategory.AUTH),
     UNAUTHORIZED_ATTEMPT(AuditLogEntryCategory.AUTH),
-    UNKNOWN(AuditLogEntryCategory.OTHER),
     LOGIN_SUCCESS(AuditLogEntryCategory.AUTH);
 
     final AuditLogEntryCategory category;

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +52,7 @@ public class AuditLogManager
 
     // FQL always writes to a BinLog, but it is a type of IAuditLogger
     private final FullQueryLogger fullQueryLogger;
+    private final ImmutableSet<AuditLogEntryCategory> fqlInlcudeFilter = ImmutableSet.of(AuditLogEntryCategory.OTHER, AuditLogEntryCategory.QUERY, AuditLogEntryCategory.DCL, AuditLogEntryCategory.DML, AuditLogEntryCategory.DDL);
 
     // auditLogger can write anywhere, as it's pluggable (logback, BinLog, DiagnosticEvents, etc ...)
     private volatile IAuditLogger auditLogger;
@@ -119,19 +121,35 @@ public class AuditLogManager
         return SchemaConstants.isLocalSystemKeyspace(keyspaceName);
     }
 
-    public void log(AuditLogEntry logEntry)
+    /**
+     * Logs AuditLogEntry to standard audit logger
+     * @param logEntry AuditLogEntry to be logged
+     */
+    private void logAuditLoggerEntry(AuditLogEntry logEntry)
     {
-        if (logEntry == null)
-            return;
-
         if (isAuditingEnabled()
+            && logEntry != null
             && (logEntry.getKeyspace() == null || !isSystemKeyspace(logEntry.getKeyspace()))
             && !filter.isFiltered(logEntry))
         {
             auditLogger.log(logEntry);
         }
+    }
 
-        if (isFQLEnabled())
+    /**
+     * Logs AudigLogEntry to both FQL and standard audit logger
+     * @param logEntry AuditLogEntry to be logged
+     */
+    public void log(AuditLogEntry logEntry)
+    {
+        if (logEntry == null) return;
+
+        if (isAuditingEnabled())
+        {
+            logAuditLoggerEntry(logEntry);
+        }
+
+        if (isFQLEnabled() && fqlInlcudeFilter.contains(logEntry.getType().getCategory()))
         {
             fullQueryLogger.log(logEntry);
         }
@@ -162,6 +180,16 @@ public class AuditLogManager
         }
     }
 
+    /**
+     * Logs Batch queries to both FQL and standard audit logger.
+     * @param batchTypeName Type of the batch (Logged, Unlogged etc.,)
+     * @param queryOrIdList Query or PreparedStatementId list
+     * @param values Bind values of prepared statements
+     * @param prepared List of prepared statements
+     * @param options Query options
+     * @param state Query state
+     * @param queryStartNanoTime  Query start time in Nanoseconds
+     */
     public void logBatch(String batchTypeName, List<Object> queryOrIdList, List<List<ByteBuffer>> values, List<ParsedStatement.Prepared> prepared, QueryOptions options, QueryState state, long queryStartNanoTime)
     {
         if (!(isAuditingEnabled() || isFQLEnabled()))
@@ -169,10 +197,13 @@ public class AuditLogManager
 
         if (isAuditingEnabled())
         {
-            List<AuditLogEntry> entries = buildEntriesForBatch(queryOrIdList, prepared, state, options);
+            List<AuditLogEntry> entries = buildEntriesForBatch(queryOrIdList, prepared, state, options, queryStartNanoTime);
             for (AuditLogEntry auditLogEntry : entries)
             {
-                log(auditLogEntry);
+                /* Ensure only auditLogger.log() is being called here not AuditLogManager:log(),
+                 * otherwise FQL would get 2 log entries for the same operation
+                 */
+                logAuditLoggerEntry(auditLogEntry);
             }
         }
 
@@ -187,12 +218,12 @@ public class AuditLogManager
         }
     }
 
-    private static List<AuditLogEntry> buildEntriesForBatch(List<Object> queryOrIdList, List<ParsedStatement.Prepared> prepared, QueryState state, QueryOptions options)
+    private static List<AuditLogEntry> buildEntriesForBatch(List<Object> queryOrIdList, List<ParsedStatement.Prepared> prepared, QueryState state, QueryOptions options, long queryStartNanoTime)
     {
         List<AuditLogEntry> auditLogEntries = new ArrayList<>(queryOrIdList.size() + 1);
         UUID batchId = UUID.randomUUID();
         String queryString = String.format("BatchId:[%s] - BATCH of [%d] statements", batchId, queryOrIdList.size());
-        AuditLogEntry entry = new AuditLogEntry.Builder(state.getClientState())
+        AuditLogEntry entry = new AuditLogEntry.Builder(state.getClientState(), queryStartNanoTime)
                               .setOperation(queryString)
                               .setOptions(options)
                               .setBatch(batchId)
@@ -203,7 +234,7 @@ public class AuditLogManager
         for (int i = 0; i < queryOrIdList.size(); i++)
         {
             CQLStatement statement = prepared.get(i).statement;
-            entry = new AuditLogEntry.Builder(state.getClientState())
+            entry = new AuditLogEntry.Builder(state.getClientState(), queryStartNanoTime)
                     .setType(statement.getAuditLogContext().auditLogEntryType)
                     .setOperation(prepared.get(i).rawCQLStatement)
                     .setScope(statement)
