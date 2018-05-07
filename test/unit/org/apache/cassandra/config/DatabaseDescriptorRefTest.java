@@ -121,6 +121,7 @@ public class DatabaseDescriptorRefTest
     "org.apache.cassandra.TeeingAppender",
     "org.apache.cassandra.audit.IAuditLogger",
     "org.apache.cassandra.audit.BinAuditLogger",
+    "org.apache.cassandra.audit.BinLogAuditLogger",
     "org.apache.cassandra.audit.FullQueryLogger",
     "org.apache.cassandra.audit.AuditLogOptions",
     // generated classes
