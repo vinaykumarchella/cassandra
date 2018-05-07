@@ -127,6 +127,24 @@ NodeTool command to disable AuditLog
 
 
 
+
+NodeTool command to reload AuditLog filters
+"""""""""""""""""""""""""""""""""""
+
+``enableauditlog``: NodeTool enableauditlog command can be used to reload auditlog filters when called with default or previous ``loggername`` and updated filters
+
+E.g.,
+::
+
+    nodetool enableauditlog --loggername <Default/ existing loggerName> --included-keyspaces <New Filter values>
+
+
+
+
+
+
+
+
 Sample output
 ^^^^^^^^^^^^^^^^^
 ::
