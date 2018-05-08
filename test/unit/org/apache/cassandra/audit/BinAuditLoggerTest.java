@@ -41,7 +41,6 @@ import static org.junit.Assert.assertTrue;
 
 public class BinAuditLoggerTest extends CQLTester
 {
-
     private static Path tempDir;
 
     @BeforeClass
@@ -61,7 +60,6 @@ public class BinAuditLoggerTest extends CQLTester
     @Test
     public void testSelectRoundTripQuery() throws Throwable
     {
-
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
         execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 1, "Apache", "Cassandra");
         execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 2, "trace", "test");

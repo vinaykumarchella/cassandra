@@ -17,7 +17,6 @@
  */
 package org.apache.cassandra.audit;
 
-import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -53,13 +52,8 @@ public class AuditLoggerTest extends CQLTester
         requireNetwork();
     }
 
-    @AfterClass
-    public static void tearDown()
-    {
-    }
-
     @Before
-    public void beforeTestMethod() throws Throwable
+    public void beforeTestMethod()
     {
         AuditLogOptions options = new AuditLogOptions();
         enableAuditLogOptions(options);
@@ -315,7 +309,7 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlBATCH_Multiple_Tables_Auditing() throws Throwable
+    public void testCqlBATCH_Multiple_Tables_Auditing()
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
         String table1 = currentTable();
@@ -636,7 +630,7 @@ public class AuditLoggerTest extends CQLTester
         return rs;
     }
 
-    private ResultSet executeAndAssertNoAuditLog(String cql, Object... bindValues) throws Throwable
+    private ResultSet executeAndAssertNoAuditLog(String cql, Object... bindValues)
     {
         Session session = sessionNet();
 
@@ -647,7 +641,7 @@ public class AuditLoggerTest extends CQLTester
         return rs;
     }
 
-    private ResultSet executeAndAssertDisableAuditLog(String cql, Object... bindValues) throws Throwable
+    private ResultSet executeAndAssertDisableAuditLog(String cql, Object... bindValues)
     {
         Session session = sessionNet();
 

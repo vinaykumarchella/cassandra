@@ -22,31 +22,25 @@ import java.util.Queue;
 
 public class InMemoryAuditLogger implements IAuditLogger
 {
-    public static InMemoryAuditLogger instance = null;
-    public final Queue<AuditLogEntry> inMemQueue = new LinkedList<>();
-
-    public static InMemoryAuditLogger getInstance()
-    {
-        if (instance == null)
-        {
-            instance = new InMemoryAuditLogger();
-        }
-        return instance;
-    }
+    final Queue<AuditLogEntry> inMemQueue = new LinkedList<>();
+    private boolean enabled = true;
 
     @Override
     public boolean enabled()
     {
-        return true;
+        return enabled;
     }
 
+    @Override
     public void log(AuditLogEntry logMessage)
     {
         inMemQueue.offer(logMessage);
     }
 
+    @Override
     public void stop()
     {
+        enabled = false;
         inMemQueue.clear();
     }
 }
