@@ -69,7 +69,7 @@ abstract class BinLogAuditLogger implements IAuditLogger
         EMPTY_BYTEBUF_SIZE = tempSize;
     }
 
-    protected static final Logger logger = LoggerFactory.getLogger(FullQueryLogger.class);
+    protected static final Logger logger = LoggerFactory.getLogger(BinLogAuditLogger.class);
     private static final NoSpamLogger noSpamLogger = NoSpamLogger.getLogger(logger, 1, TimeUnit.MINUTES);
     private static final NoSpamLogger.NoSpamLogStatement droppedSamplesStatement = noSpamLogger.getStatement("Dropped {} binary log samples", 1, TimeUnit.MINUTES);
 

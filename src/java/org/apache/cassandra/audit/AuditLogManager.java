@@ -52,7 +52,11 @@ public class AuditLogManager
 
     // FQL always writes to a BinLog, but it is a type of IAuditLogger
     private final FullQueryLogger fullQueryLogger;
-    private final ImmutableSet<AuditLogEntryCategory> fqlInlcudeFilter = ImmutableSet.of(AuditLogEntryCategory.OTHER, AuditLogEntryCategory.QUERY, AuditLogEntryCategory.DCL, AuditLogEntryCategory.DML, AuditLogEntryCategory.DDL);
+    private final ImmutableSet<AuditLogEntryCategory> fqlIncludeFilter = ImmutableSet.of(AuditLogEntryCategory.OTHER,
+                                                                                         AuditLogEntryCategory.QUERY,
+                                                                                         AuditLogEntryCategory.DCL,
+                                                                                         AuditLogEntryCategory.DML,
+                                                                                         AuditLogEntryCategory.DDL);
 
     // auditLogger can write anywhere, as it's pluggable (logback, BinLog, DiagnosticEvents, etc ...)
     private volatile IAuditLogger auditLogger;
@@ -72,7 +76,7 @@ public class AuditLogManager
         }
         else
         {
-            logger.info("Audit logging is disabled.");
+            logger.debug("Audit logging is disabled.");
             isAuditLogEnabled = false;
             auditLogger = new NoOpAuditLogger();
         }
@@ -103,7 +107,7 @@ public class AuditLogManager
 
     public boolean isAuditingEnabled()
     {
-        return this.isAuditLogEnabled;
+        return isAuditLogEnabled;
     }
 
     public boolean isLoggingEnabled()
@@ -127,9 +131,7 @@ public class AuditLogManager
      */
     private void logAuditLoggerEntry(AuditLogEntry logEntry)
     {
-        if (isAuditingEnabled()
-            && logEntry != null
-            && (logEntry.getKeyspace() == null || !isSystemKeyspace(logEntry.getKeyspace()))
+        if ((logEntry.getKeyspace() == null || !isSystemKeyspace(logEntry.getKeyspace()))
             && !filter.isFiltered(logEntry))
         {
             auditLogger.log(logEntry);
@@ -142,14 +144,15 @@ public class AuditLogManager
      */
     public void log(AuditLogEntry logEntry)
     {
-        if (logEntry == null) return;
+        if (logEntry == null)
+            return;
 
         if (isAuditingEnabled())
         {
             logAuditLoggerEntry(logEntry);
         }
 
-        if (isFQLEnabled() && fqlInlcudeFilter.contains(logEntry.getType().getCategory()))
+        if (isFQLEnabled() && fqlIncludeFilter.contains(logEntry.getType().getCategory()))
         {
             fullQueryLogger.log(logEntry);
         }
@@ -249,58 +252,42 @@ public class AuditLogManager
     }
 
     /**
-     * Disables AuditLog, this is supposed to be used only via JMX/ Nodetool. Not designed to call from anywhere else in the codepath
+     * Disables AuditLog, designed to be invoked only via JMX/ Nodetool, not from anywhere else in the codepath.
      */
     public synchronized void disableAuditLog()
     {
-        logger.info("Audit logging is disabled, stopping any existing loggers");
-        if (this.isAuditingEnabled())
+        if (isAuditLogEnabled)
         {
-            /*
-             * Disable isAuditLogEnabled before attempting to cleanup/ stop AuditLogger so that any incoming log() requests
-             * would be filtered. To avoid further race conditions, this.auditLogger is swapped with No-Op implementation
-             * of IAuditLogger.
-             */
-
-            this.isAuditLogEnabled = false;
+            // Disable isAuditLogEnabled before attempting to cleanup/ stop AuditLogger so that any incoming log() requests will be dropped.
+            isAuditLogEnabled = false;
             IAuditLogger oldLogger = auditLogger;
-            /*
-             * Avoid race conditions by passing NoOpAuditLogger while disabling auditlog via nodetool
-             */
             auditLogger = new NoOpAuditLogger();
             oldLogger.stop();
         }
     }
 
     /**
-     * Enables AuditLog, this is supposed to be used only via JMX/ Nodetool. Not designed to call from anywhere else in the codepath
+     * Enables AuditLog, designed to be invoked only via JMX/ Nodetool, not from anywhere else in the codepath.
      * @param auditLogOptions AuditLogOptions to be used for enabling AuditLog
      * @throws ConfigurationException It can throw configuration exception when provided logger class does not exist in the classpath
      */
     public synchronized void enableAuditLog(AuditLogOptions auditLogOptions) throws ConfigurationException
     {
-        logger.debug("Audit logging is being enabled. Reloading AuditLogOptions.");
-        IAuditLogger oldLogger = auditLogger;
-
+        // always reload the filters
         filter = AuditLogFilter.create(auditLogOptions);
 
-        if (oldLogger != null && oldLogger.getClass().getSimpleName().equals(auditLogOptions.logger))
-        {
-            logger.info("New AuditLogger [{}] is same as existing logger, hence not initializing the logger", auditLogOptions.logger);
+        // next, check to see if we're changing the logging implementation; if not, keep the same instance and bail.
+        // note: auditLogger should never be null
+        IAuditLogger oldLogger = auditLogger;
+        if (oldLogger.getClass().getSimpleName().equals(auditLogOptions.logger))
             return;
-        }
 
         auditLogger = getAuditLogger(auditLogOptions.logger);
+        isAuditLogEnabled = true;
 
-        /* Ensure oldLogger's stop() is called after we swap it with new logger otherwise,
-         * we might be calling log() on the stopped logger.
-         */
-        if (oldLogger != null)
-        {
-            oldLogger.stop();
-        }
-        this.isAuditLogEnabled = true;
-        logger.debug("Audit logging is enabled. Reloaded AuditLogOptions.");
+        // ensure oldLogger's stop() is called after we swap it with new logger,
+        // otherwise, we might be calling log() on the stopped logger.
+        oldLogger.stop();
     }
 
     public void configureFQL(Path path, String rollCycle, boolean blocking, int maxQueueWeight, long maxLogSize)

@@ -33,11 +33,12 @@ public class BinAuditLogger extends BinLogAuditLogger implements IAuditLogger
     {
         // due to the way that IAuditLogger instance are created in AuditLogManager, via reflection, we can't assume
         // the manager will call configure() (it won't). thus, we have to call it here from the constructor.
-        configure(Paths.get(DatabaseDescriptor.getAuditLoggingOptions().audit_logs_dir),
-                  DatabaseDescriptor.getAuditLoggingOptions().roll_cycle,
-                  DatabaseDescriptor.getAuditLoggingOptions().block,
-                  DatabaseDescriptor.getAuditLoggingOptions().max_queue_weight,
-                  DatabaseDescriptor.getAuditLoggingOptions().max_log_size,
+        AuditLogOptions auditLoggingOptions = DatabaseDescriptor.getAuditLoggingOptions();
+        configure(Paths.get(auditLoggingOptions.audit_logs_dir),
+                  auditLoggingOptions.roll_cycle,
+                  auditLoggingOptions.block,
+                  auditLoggingOptions.max_queue_weight,
+                  auditLoggingOptions.max_log_size,
                   false);
     }
 

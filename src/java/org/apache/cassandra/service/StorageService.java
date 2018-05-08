@@ -5397,7 +5397,8 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         logger.info("Auditlog is disabled");
     }
 
-    public void enableAuditLog(String loggerName, String includedKeyspaces, String excludedKeyspaces, String includedCategories, String excludedCategories, String includedUsers, String excludedUsers) throws ConfigurationException, IllegalStateException
+    public void enableAuditLog(String loggerName, String includedKeyspaces, String excludedKeyspaces, String includedCategories, String excludedCategories,
+                               String includedUsers, String excludedUsers) throws ConfigurationException, IllegalStateException
     {
         loggerName = loggerName != null ? loggerName : DatabaseDescriptor.getAuditLoggingOptions().logger;
 
@@ -5427,5 +5428,4 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
     {
         return AuditLogManager.getInstance().isAuditingEnabled();
     }
-
 }
