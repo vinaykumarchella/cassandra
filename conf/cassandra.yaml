@@ -1190,6 +1190,7 @@ back_pressure_strategy:
 audit_logging_options:
     enabled: false
     logger: BinAuditLogger
+    # audit_logs_dir:
     # included_keyspaces: 
     # excluded_keyspaces:
     # included_categories:

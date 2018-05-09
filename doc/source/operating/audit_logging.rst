@@ -25,14 +25,13 @@ Audit logging in Cassandra logs every incoming CQL command request, Authenticati
 to C* node. Currently, there are two implementations provided, the custom logger can be implemented and injected with the
 class name as a parameter in cassandra.yaml.
 
-- ``BinAuditLogger`` An efficient way to log events to ``${cassandra.logdir.audit}``
-   or ``${cassandra.logdir}/audit/`` directory in binary format.
+- ``BinAuditLogger`` An efficient way to log events to file in a binary format.
 - ``FileAuditLogger`` Logs events to  ``audit/audit.log`` file using slf4j logger.
 
 *Recommendation* ``BinAuditLogger`` is a community recommended logger considering the performance
 
 What does it capture
-^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
 
 Audit logging captures following events
 
@@ -41,7 +40,7 @@ Audit logging captures following events
 - All database commands executed via Native protocol (CQL) attempted or successfully executed.
 
 What does it log
-^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^
 Each audit log implementation has access to the following attributes, and for the default text based logger these fields are concatenated with `|` s to yield the final message.
 
  - ``user``: User name(if available)
@@ -56,13 +55,14 @@ Each audit log implementation has access to the following attributes, and for th
  - ``operation`` - CQL command being executed
 
 How to configure
-^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^
 Auditlog can be configured using cassandra.yaml. If you want to try Auditlog on one node, it can also be enabled and configured using ``nodetool``.
 
 cassandra.yaml configurations for AuditLog
-"""""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""""""""""""""""""
 	- ``enabled``: This option enables/ disables audit log
 	- ``logger``: Class name of the logger/ custom logger.
+	- ``audit_logs_dir``: Auditlogs directory location, if not set, default to `cassandra.logdir.audit` or `cassandra.logdir` + /audit/
 	- ``included_keyspaces``: Comma separated list of keyspaces to be included in audit log, default - includes all keyspaces
 	- ``excluded_keyspaces``: Comma separated list of keyspaces to be excluded from audit log, default - excludes no keyspace
 	- ``included_categories``: Comma separated list of Audit Log Categories to be included in audit log, default - includes all categories
@@ -74,7 +74,7 @@ cassandra.yaml configurations for AuditLog
 List of available categories are: QUERY, DML, DDL, DCL, OTHER, AUTH, ERROR, PREPARE
 
 NodeTool command to enable AuditLog
-"""""""""""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""""""""""
 ``enableauditlog``: Enables AuditLog with yaml defaults. yaml configurations can be overridden using options via nodetool command.
 
 ::
@@ -82,7 +82,7 @@ NodeTool command to enable AuditLog
     nodetool enableauditlog
 
 Options
-*******
+**********
 
 
 ``--excluded-categories``
@@ -115,7 +115,7 @@ Options
 
 
 NodeTool command to disable AuditLog
-"""""""""""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""""""""""""
 
 ``disableauditlog``: Disables AuditLog.
 
@@ -130,7 +130,7 @@ NodeTool command to disable AuditLog
 
 
 NodeTool command to reload AuditLog filters
-"""""""""""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""""""""""""""""""
 
 ``enableauditlog``: NodeTool enableauditlog command can be used to reload auditlog filters when called with default or previous ``loggername`` and updated filters
 
@@ -147,12 +147,32 @@ E.g.,
 
 
 Sample output
-^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^
 ::
 
     LogMessage: user:anonymous|host:localhost/X.X.X.X|source:/X.X.X.X|port:60878|timestamp:1521158923615|type:USE_KS|category:DDL|ks:dev1|operation:USE "dev1"
 
 
+
+Configuring BinAuditLogger
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+To use ``BinAuditLogger`` as a logger in AuditLogging, set the logger to ``BinAuditLogger`` in cassandra.yaml under ``audit_logging_options`` section. ``BinAuditLogger`` can be futher configued using its advanced options in cassandra.yaml.
+
+
+Adcanced Options for BinAuditLogger
+""""""""""""""""""""""""""""""""""""""
+
+``block``
+	Indicates if the AuditLog should block if the it falls behind or should drop audit log records. Default is set to ``true`` so that AuditLog records wont be lost
+
+``max_queue_weight``
+	Maximum weight of in memory queue for records waiting to be written to the audit log file before blocking or dropping the log records. Default is set to ``256 * 1024 * 1024``
+
+``max_log_size``
+	Maximum size of the rolled files to retain on disk before deleting the oldest file. Default is set to ``16L * 1024L * 1024L * 1024L``
+
+``roll_cycle``
+	How often to roll Audit log segments so they can potentially be reclaimed. Available options are: MINUTELY, HOURLY, DAILY, LARGE_DAILY, XLARGE_DAILY, HUGE_DAILY.For more options, refer: net.openhft.chronicle.queue.RollCycles. Default is set to ``"HOURLY"``
 
 Configuring FileAuditLogger
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
