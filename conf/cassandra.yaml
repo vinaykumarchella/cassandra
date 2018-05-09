@@ -1185,21 +1185,15 @@ back_pressure_strategy:
 # Limit the number of concurrent sstable upgrades
 # max_concurrent_automatic_sstable_upgrades: 1
 
-# Audit logging - Logs every incoming CQL command request, Authentication (successful as well as unsuccessful login)
-# to C* node. Custom logger can be implemented and injected here with the class name.
-# system keyspaces are excluded from audit log.
-# enabled: This option enables/ disables audit log
-# logger: Class name of the logger/ custom logger. Available logger implementation are
-#         "BinAuditLogger" - Efficient way to log events to file, Binary format. Default location: "${cassandra.logdir.audit}"
-#         or "${cassandra.logdir}/audit/" directory.
-# included_keyspaces: comma separated list of keyspaces to be included for audit log, default - includes all keyspaces
-# excluded_keyspaces: comma separated list of keyspaces to be excluded for audit log, default - excludes no keyspace
-# included_categories: comma separated list of Audit Log Categories to be included for audit log, default - includes all categories
-# excluded_categories: comma separated list of Audit Log Categories to be excluded for audit log, default - excludes no category
-# List of available categories are found in org.apache.cassandra.audit.AuditLogEntryType.java file
-# included_users: comma separated list of users to be included for audit log, default - includes all users
-# excluded_users: comma separated list of users to be excluded for audit log, default - excludes no user
+# Audit logging - Logs every incoming CQL command request, authentication to a node. See the docs
+# on audit_logging for full details about the various configuration options.
 audit_logging_options:
     enabled: false
     logger: BinAuditLogger
+    # included_keyspaces: 
+    # excluded_keyspaces:
+    # included_categories:
+    # excluded_categories:
+    # included_users:
+    # excluded_users:
 

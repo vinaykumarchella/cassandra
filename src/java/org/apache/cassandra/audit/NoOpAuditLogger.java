@@ -18,8 +18,7 @@
 package org.apache.cassandra.audit;
 
 /**
- * No-Op implementation of AuditLogger class is used as a default audit logger when AuditLogger is disabled.
- * This class helps avoiding any race conditions while enabling/ disabling audit logging via JMX
+ * No-Op implementation of {@link IAuditLogger} to be used as a default audit logger when audit logging is disabled.
  */
 public class NoOpAuditLogger implements IAuditLogger
 {

@@ -278,7 +278,7 @@ public class BatchMessage extends Message.Request
         StringBuilder sb = new StringBuilder();
         sb.append("BATCH of [");
         sb.append(queryOrIdList.size());
-        sb.append("] statements  at consistency ").append(options.getConsistency());
+        sb.append("] statements at consistency ").append(options.getConsistency());
         return sb.toString();
     }
 }

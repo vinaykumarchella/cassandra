@@ -18,13 +18,11 @@
 package org.apache.cassandra.transport.messages;
 
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableMap;
 
 import io.netty.buffer.ByteBuf;
 import org.apache.cassandra.audit.AuditLogEntry;
-import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.audit.AuditLogManager;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.QueryProcessor;
@@ -119,14 +117,16 @@ public class QueryMessage extends Message.Request
                 Tracing.instance.begin("Execute CQL3 query", state.getClientAddress(), builder.build());
             }
 
+            long fqlTime = isLoggingEnabled ? System.currentTimeMillis() : 0;
             Message.Response response = ClientState.getCQLQueryHandler().process(query, state, options, getCustomPayload(), queryStartNanoTime);
 
             if (isLoggingEnabled)
             {
                 ParsedStatement.Prepared parsedStatement = QueryProcessor.parseStatement(query, state.getClientState());
-                AuditLogEntry auditEntry = new AuditLogEntry.Builder(state.getClientState(), queryStartNanoTime)
+                AuditLogEntry auditEntry = new AuditLogEntry.Builder(state.getClientState())
                                            .setType(parsedStatement.statement.getAuditLogContext().auditLogEntryType)
                                            .setOperation(query)
+                                           .setTimestamp(fqlTime)
                                            .setScope(parsedStatement.statement)
                                            .setKeyspace(state, parsedStatement.statement)
                                            .setOptions(options)

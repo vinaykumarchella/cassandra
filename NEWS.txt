@@ -79,10 +79,9 @@ New features
      in cassandra.yaml, and the docs for create and alter role statements. CASSANDRA-13985
    - Roles altered from login=true to login=false will prevent existing connections from executing any
      statements after the cache has been refreshed. CASSANDRA-13985
-   - CASSANDRA-12151 Audit logging for database activity. Logs every incoming CQL command request, Authentication
-     (successful as well as unsuccessful login)to C* node.
-   - CASSANDRA-12151 Support audit logging for database activity. If enabled, logs every incoming CQL command request,
-     Authentication (successful as well as unsuccessful login)to C* node.
+   - Support for audit logging of database activity. If enabled, logs every incoming
+     CQL command request, Authentication (successful as well as unsuccessful login) to a node.
+
 Upgrading
 ---------
     - Cassandra 4.0 removed support for COMPACT STORAGE tables. All Compact Tables

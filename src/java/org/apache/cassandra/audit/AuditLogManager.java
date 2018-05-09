@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
@@ -43,7 +44,8 @@ import org.apache.cassandra.utils.FBUtilities;
 /**
  * Central location for managing the logging of client/user-initated actions (like queries, log in commands, and so on).
  *
- * We can run multiple {@link IAuditLogger}s at the same time, including the standard audit logger and the fq logger.
+ * We can run multiple {@link IAuditLogger}s at the same time, including the standard audit logger ({@link #auditLogger}
+ * and the full query logger ({@link #fullQueryLogger}.
  */
 public class AuditLogManager
 {
@@ -195,17 +197,11 @@ public class AuditLogManager
      */
     public void logBatch(String batchTypeName, List<Object> queryOrIdList, List<List<ByteBuffer>> values, List<ParsedStatement.Prepared> prepared, QueryOptions options, QueryState state, long queryStartNanoTime)
     {
-        if (!(isAuditingEnabled() || isFQLEnabled()))
-            return;
-
         if (isAuditingEnabled())
         {
             List<AuditLogEntry> entries = buildEntriesForBatch(queryOrIdList, prepared, state, options, queryStartNanoTime);
             for (AuditLogEntry auditLogEntry : entries)
             {
-                /* Ensure only auditLogger.log() is being called here not AuditLogManager:log(),
-                 * otherwise FQL would get 2 log entries for the same operation
-                 */
                 logAuditLoggerEntry(auditLogEntry);
             }
         }
@@ -226,9 +222,11 @@ public class AuditLogManager
         List<AuditLogEntry> auditLogEntries = new ArrayList<>(queryOrIdList.size() + 1);
         UUID batchId = UUID.randomUUID();
         String queryString = String.format("BatchId:[%s] - BATCH of [%d] statements", batchId, queryOrIdList.size());
-        AuditLogEntry entry = new AuditLogEntry.Builder(state.getClientState(), queryStartNanoTime)
+        long queryStartTimeMillis = TimeUnit.NANOSECONDS.toMillis(queryStartNanoTime);
+        AuditLogEntry entry = new AuditLogEntry.Builder(state.getClientState())
                               .setOperation(queryString)
                               .setOptions(options)
+                              .setTimestamp(queryStartTimeMillis)
                               .setBatch(batchId)
                               .setType(AuditLogEntryType.BATCH)
                               .build();
@@ -237,9 +235,10 @@ public class AuditLogManager
         for (int i = 0; i < queryOrIdList.size(); i++)
         {
             CQLStatement statement = prepared.get(i).statement;
-            entry = new AuditLogEntry.Builder(state.getClientState(), queryStartNanoTime)
+            entry = new AuditLogEntry.Builder(state.getClientState())
                     .setType(statement.getAuditLogContext().auditLogEntryType)
                     .setOperation(prepared.get(i).rawCQLStatement)
+                    .setTimestamp(queryStartTimeMillis)
                     .setScope(statement)
                     .setKeyspace(state, statement)
                     .setOptions(options)
@@ -273,6 +272,12 @@ public class AuditLogManager
      */
     public synchronized void enableAuditLog(AuditLogOptions auditLogOptions) throws ConfigurationException
     {
+        if (isFQLEnabled() && fullQueryLogger.path().toString().equals(auditLogOptions.audit_logs_dir))
+            throw new IllegalArgumentException(String.format("audit log path (%s) cannot be the same as the " +
+                                                             "running full query logger (%s)",
+                                                             auditLogOptions.audit_logs_dir,
+                                                             fullQueryLogger.path()));
+
         // always reload the filters
         filter = AuditLogFilter.create(auditLogOptions);
 
@@ -292,6 +297,12 @@ public class AuditLogManager
 
     public void configureFQL(Path path, String rollCycle, boolean blocking, int maxQueueWeight, long maxLogSize)
     {
+        if (path.equals(auditLogger.path()))
+            throw new IllegalArgumentException(String.format("fullquerylogger path (%s) cannot be the same as the " +
+                                                             "running audit logger (%s)",
+                                                             path,
+                                                             auditLogger.path()));
+
         fullQueryLogger.configure(path, rollCycle, blocking, maxQueueWeight, maxLogSize);
     }
 

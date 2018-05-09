@@ -550,7 +550,6 @@ public abstract class CQLTester
         return keyspaces.get(keyspaces.size() - 1);
     }
 
-
     protected ByteBuffer unset()
     {
         return ByteBufferUtil.UNSET_BYTE_BUFFER;

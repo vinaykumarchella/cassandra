@@ -17,6 +17,7 @@
  */
 package org.apache.cassandra.audit;
 
+import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.Queue;
 

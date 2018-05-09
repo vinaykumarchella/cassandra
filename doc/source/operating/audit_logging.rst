@@ -70,7 +70,8 @@ cassandra.yaml configurations for AuditLog
 	- ``included_users``: Comma separated list of users to be included in audit log, default - includes all users
 	- ``excluded_users``: Comma separated list of users to be excluded from audit log, default - excludes no user
 
-List of available categories are found in ``org.apache.cassandra.audit.AuditLogEntryType.java`` file
+	  
+List of available categories are: QUERY, DML, DDL, DCL, OTHER, AUTH, ERROR, PREPARE
 
 NodeTool command to enable AuditLog
 """""""""""""""""""""""""""""""""""

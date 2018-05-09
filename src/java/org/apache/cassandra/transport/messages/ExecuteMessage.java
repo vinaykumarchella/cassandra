@@ -18,7 +18,6 @@
 package org.apache.cassandra.transport.messages;
 
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -166,13 +165,15 @@ public class ExecuteMessage extends Message.Request
             // by wrapping the QueryOptions.
             QueryOptions queryOptions = QueryOptions.addColumnSpecifications(options, prepared.boundNames);
 
+            long fqlTime = isLoggingEnabled ? System.currentTimeMillis() : 0;
             Message.Response response = handler.processPrepared(statement, state, queryOptions, getCustomPayload(), queryStartNanoTime);
 
             if (isLoggingEnabled)
             {
-                AuditLogEntry auditEntry = new AuditLogEntry.Builder(state.getClientState(), queryStartNanoTime)
+                AuditLogEntry auditEntry = new AuditLogEntry.Builder(state.getClientState())
                                            .setType(statement.getAuditLogContext().auditLogEntryType)
                                            .setOperation(prepared.rawCQLStatement)
+                                           .setTimestamp(fqlTime)
                                            .setScope(statement)
                                            .setKeyspace(state, statement)
                                            .setOptions(options)

@@ -21,12 +21,15 @@ import java.util.HashSet;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class AuditLogFilter
 {
     private static final Logger logger = LoggerFactory.getLogger(AuditLogFilter.class);
+
+    private static ImmutableSet<String> EMPTY_FILTERS = ImmutableSet.of();
 
     private final ImmutableSet<String> excludedKeyspaces;
     private final ImmutableSet<String> includedKeyspaces;
@@ -46,56 +49,81 @@ public class AuditLogFilter
     }
 
     /**
-     * (Re-)Loads filters from config. Called during startup as well as JMX filter reload.
+     * (Re-)Loads filters from config. Called during startup as well as JMX invocations.
      */
     public static AuditLogFilter create(AuditLogOptions auditLogOptions)
     {
         logger.trace("Loading AuditLog filters");
-        Set<String> includedKeyspacesSet = new HashSet<>();
-        Set<String> excludedKeyspacesSet = new HashSet<>();
 
-        Set<String> excludedCategoriesSet = new HashSet<>();
-        Set<String> includedCategoriesSet = new HashSet<>();
+        IncludeExcludeHolder keyspaces = loadInputSets(auditLogOptions.included_keyspaces, auditLogOptions.excluded_keyspaces);
+        IncludeExcludeHolder categories = loadInputSets(auditLogOptions.included_categories, auditLogOptions.excluded_categories);
+        IncludeExcludeHolder users = loadInputSets(auditLogOptions.included_users, auditLogOptions.excluded_users);
 
-        Set<String> excludedUsersSet = new HashSet<>();
-        Set<String> includedUsersSet = new HashSet<>();
-
-        loadInputSets(includedKeyspacesSet, auditLogOptions.included_keyspaces,
-                      excludedKeyspacesSet, auditLogOptions.excluded_keyspaces);
-
-        loadInputSets(includedCategoriesSet, auditLogOptions.included_categories,
-                      excludedCategoriesSet, auditLogOptions.excluded_categories);
-
-        loadInputSets(includedUsersSet, auditLogOptions.included_users,
-                      excludedUsersSet, auditLogOptions.excluded_users);
-
-
-        return new AuditLogFilter(ImmutableSet.copyOf(excludedKeyspacesSet), ImmutableSet.copyOf(includedKeyspacesSet),
-                                  ImmutableSet.copyOf(excludedCategoriesSet), ImmutableSet.copyOf(includedCategoriesSet),
-                                  ImmutableSet.copyOf(excludedUsersSet), ImmutableSet.copyOf(includedUsersSet));
+        return new AuditLogFilter(keyspaces.excludedSet, keyspaces.includedSet,
+                                  categories.excludedSet, categories.includedSet,
+                                  users.excludedSet, users.includedSet);
     }
 
     /**
      * Constructs mutually exclusive sets of included and excluded data. When there is a conflict,
      * the entry is put into the excluded set (and removed fron the included).
      */
-    private static void loadInputSets(Set<String> includedSet, String includedInput, Set<String> excludedSet, String excludedInput)
+    private static IncludeExcludeHolder loadInputSets(String includedInput, String excludedInput)
     {
-        for (String exclude : excludedInput.split(","))
+        final ImmutableSet<String> excludedSet;
+        if (StringUtils.isEmpty(excludedInput))
         {
-            if (!exclude.isEmpty())
+            excludedSet = EMPTY_FILTERS;
+        }
+        else
+        {
+            String[] excludes = excludedInput.split(",");
+            ImmutableSet.Builder<String> builder = ImmutableSet.builderWithExpectedSize(excludes.length);
+            for (String exclude : excludes)
             {
-                excludedSet.add(exclude);
+                if (!exclude.isEmpty())
+                {
+                    builder.add(exclude);
+                }
             }
+            excludedSet = builder.build();
         }
 
-        for (String include : includedInput.split(","))
+        final ImmutableSet<String> includedSet;
+        if (StringUtils.isEmpty(includedInput))
         {
-            //Ensure both included and excluded sets are mutually exclusive
-            if (!include.isEmpty() && !excludedSet.contains(include))
+            includedSet = EMPTY_FILTERS;
+        }
+        else
+        {
+            String[] includes = includedInput.split(",");
+            ImmutableSet.Builder<String> builder = ImmutableSet.builderWithExpectedSize(includes.length);
+            for (String include : includes)
             {
-                includedSet.add(include);
+                //Ensure both included and excluded sets are mutually exclusive
+                if (!include.isEmpty() && !excludedSet.contains(include))
+                {
+                    builder.add(include);
+                }
             }
+            includedSet = builder.build();
+        }
+
+        return new IncludeExcludeHolder(includedSet, excludedSet);
+    }
+
+    /**
+     * Simple struct to hold inclusion/exclusion sets.
+     */
+    private static class IncludeExcludeHolder
+    {
+        private final ImmutableSet<String> includedSet;
+        private final ImmutableSet<String> excludedSet;
+
+        private IncludeExcludeHolder(ImmutableSet<String> includedSet, ImmutableSet<String> excludedSet)
+        {
+            this.includedSet = includedSet;
+            this.excludedSet = excludedSet;
         }
     }
 

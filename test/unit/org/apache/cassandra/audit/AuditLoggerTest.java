@@ -41,7 +41,6 @@ import static org.junit.Assert.assertThat;
 
 public class AuditLoggerTest extends CQLTester
 {
-
     @BeforeClass
     public static void setUp()
     {
@@ -198,7 +197,7 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlSELECTAuditing() throws Throwable
+    public void testCqlSelectAuditing() throws Throwable
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
         execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 1, "Apache", "Cassandra");
@@ -211,7 +210,7 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlINSERTAuditing() throws Throwable
+    public void testCqlInsertAuditing() throws Throwable
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
 
@@ -220,7 +219,7 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlUPDATEAuditing() throws Throwable
+    public void testCqlUpdateAuditing() throws Throwable
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
         execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 1, "Apache", "Cassandra");
@@ -234,7 +233,7 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlDELETEAuditing() throws Throwable
+    public void testCqlDeleteAuditing() throws Throwable
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
         execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 1, "Apache", "Cassandra");
@@ -245,7 +244,7 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlTRUNCATEAuditing() throws Throwable
+    public void testCqlTruncateAuditing() throws Throwable
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
         execute("INSERT INTO %s (id, v1, v2) VALUES (?, ?, ?)", 1, "Apache", "Cassandra");
@@ -256,7 +255,7 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlBATCHAuditing() throws Throwable
+    public void testCqlBatchAuditing() throws Throwable
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
 
@@ -309,7 +308,7 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlBATCH_Multiple_Tables_Auditing()
+    public void testCqlBatch_MultipleTablesAuditing()
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
         String table1 = currentTable();
@@ -368,7 +367,7 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlKSAuditing() throws Throwable
+    public void testCqlKeyspaceAuditing() throws Throwable
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
 
@@ -423,7 +422,7 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlTYPEAuditing() throws Throwable
+    public void testCqlTypeAuditing() throws Throwable
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
 
@@ -449,7 +448,7 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlINDEXAuditing() throws Throwable
+    public void testCqlIndexAuditing() throws Throwable
     {
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
 
@@ -465,9 +464,8 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlFUNCTIONAuditing() throws Throwable
+    public void testCqlFunctionAuditing() throws Throwable
     {
-
         String tblName = createTableName();
 
         String cql = "CREATE FUNCTION IF NOT EXISTS  " + KEYSPACE + "." + tblName + " (column TEXT,num int) RETURNS NULL ON NULL INPUT RETURNS text LANGUAGE javascript AS $$ column.substring(0,num) $$";
@@ -478,9 +476,8 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlTRIGGERAuditing() throws Throwable
+    public void testCqlTriggerAuditing() throws Throwable
     {
-
         createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
 
         String tblName = currentTable();
@@ -491,10 +488,9 @@ public class AuditLoggerTest extends CQLTester
     }
 
     @Test
-    public void testCqlAGGREGATEAuditing() throws Throwable
+    public void testCqlAggregateAuditing() throws Throwable
     {
         String aggName = createTableName();
-
         String cql = "DROP AGGREGATE IF EXISTS " + KEYSPACE + "." + aggName;
         executeAndAssert(cql, AuditLogEntryType.DROP_AGGREGATE);
     }
@@ -506,14 +502,15 @@ public class AuditLoggerTest extends CQLTester
         try
         {
             createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
-
             Session session = sessionNet();
-
             ResultSet rs = session.execute(cql);
+            Assert.fail("should not succeed");
         }
         catch (SyntaxError e)
         {
+            // nop
         }
+
         AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(logEntry, cql);
         assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
@@ -529,10 +526,13 @@ public class AuditLoggerTest extends CQLTester
         {
             Session session = sessionNet();
             ResultSet rs = session.execute(cql);
+            Assert.fail("should not succeed");
         }
         catch (SyntaxError e)
         {
+            // nop
         }
+
         AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(logEntry, cql);
         assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
@@ -545,7 +545,6 @@ public class AuditLoggerTest extends CQLTester
         String cql = "INSERT INTO " + KEYSPACE + '.' + currentTable() + " (id, v1, v2) VALUES (?,?,?)";
         try
         {
-
             Session session = sessionNet();
 
             PreparedStatement pstmt = session.prepare(cql);
@@ -554,10 +553,13 @@ public class AuditLoggerTest extends CQLTester
 
             dropTable("DROP TABLE %s");
             ResultSet rs = session.execute(pstmt.bind(1, "insert_audit", "test"));
+            Assert.fail("should not succeed");
         }
         catch (NoHostAvailableException e)
         {
+            // nop
         }
+
         AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(logEntry, null);
         logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
@@ -572,14 +574,14 @@ public class AuditLoggerTest extends CQLTester
         try
         {
             createTable("CREATE TABLE %s (id int primary key, v1 text, v2 text)");
-
             Session session = sessionNet();
-
             PreparedStatement pstmt = session.prepare(cql);
             ResultSet rs = session.execute(pstmt.bind(1, "insert_audit", "test"));
+            Assert.fail("should not succeed");
         }
         catch (SyntaxError e)
         {
+            // nop
         }
         AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(logEntry, cql);
@@ -672,7 +674,6 @@ public class AuditLoggerTest extends CQLTester
         assertEquals(type, actual.getType());
         assertEquals(cql, actual.getOperation());
         assertNotEquals(0,actual.getTimestamp());
-
     }
 
     private void assertLogEntry(AuditLogEntry logEntry, String cql)

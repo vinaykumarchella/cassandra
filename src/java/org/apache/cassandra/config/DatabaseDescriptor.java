@@ -2586,11 +2586,6 @@ public class DatabaseDescriptor
         return conf.audit_logging_options;
     }
 
-    public static boolean setAuditLogEnabled(boolean auditLogEnabled)
-    {
-        return conf.audit_logging_options.enabled = auditLogEnabled;
-    }
-
     public static void setAuditLoggingOptions(AuditLogOptions auditLoggingOptions)
     {
         conf.audit_logging_options = auditLoggingOptions;

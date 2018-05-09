@@ -20,7 +20,6 @@ package org.apache.cassandra.audit;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
 import org.apache.commons.lang3.StringUtils;
@@ -147,7 +146,6 @@ public class AuditLogEntry
     {
         private static final InetAddressAndPort DEFAULT_SOURCE;
 
-        // thanks, java, for making this ugly
         static
         {
             try
@@ -194,16 +192,8 @@ public class AuditLogEntry
                 source = DEFAULT_SOURCE;
                 user = AuthenticatedUser.SYSTEM_USER.getName();
             }
-        }
 
-        public Builder(ClientState clientState, long queryStartNanoTime)
-        {
-            this(clientState);
-            /*
-             * FQLTime is time in milliseconds since the epoch since the operation was invoked, this does not involve operation execution time
-             */
-            long fqlTime = System.currentTimeMillis() - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - queryStartNanoTime);
-            timestamp = fqlTime;
+            timestamp = System.currentTimeMillis();
         }
 
         public Builder(AuditLogEntry entry)
@@ -240,6 +230,12 @@ public class AuditLogEntry
         public Builder setBatch(UUID batch)
         {
             this.batch = batch;
+            return this;
+        }
+
+        public Builder setTimestamp(long timestampMillis)
+        {
+            this.timestamp = timestampMillis;
             return this;
         }
 

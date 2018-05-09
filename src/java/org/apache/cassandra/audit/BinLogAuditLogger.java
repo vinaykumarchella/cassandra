@@ -141,6 +141,11 @@ abstract class BinLogAuditLogger implements IAuditLogger
         binLog.start();
     }
 
+    public Path path()
+    {
+        return path;
+    }
+
     /**
      * Need the path as a parameter as well because if the process is restarted the config file might be the only
      * location for retrieving the path to the full query log files, but JMX also allows you to specify a path

@@ -60,8 +60,6 @@ public enum AuditLogEntryType
     CREATE_ROLE(AuditLogEntryCategory.DCL),
     USE_KEYSPACE(AuditLogEntryCategory.OTHER),
 
-
-
     /*
      * Common Audit Log Entry Types
      */
@@ -71,14 +69,15 @@ public enum AuditLogEntryType
     UNAUTHORIZED_ATTEMPT(AuditLogEntryCategory.AUTH),
     LOGIN_SUCCESS(AuditLogEntryCategory.AUTH);
 
-    final AuditLogEntryCategory category;
+    private final AuditLogEntryCategory category;
 
-    AuditLogEntryType(AuditLogEntryCategory category) {
+    AuditLogEntryType(AuditLogEntryCategory category)
+    {
         this.category = category;
     }
 
     public AuditLogEntryCategory getCategory()
     {
-        return this.category;
+        return category;
     }
 }

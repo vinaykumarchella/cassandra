@@ -18,19 +18,30 @@
 
 package org.apache.cassandra.audit;
 
+import java.nio.file.Path;
+
 public interface IAuditLogger
 {
     boolean enabled();
 
     /**
-     * Logs AuditLogEntry to underlying implementation of IAdutitLogger. log() might be called after stop(),
-     * hence implementation of IAuditLogger:log() has to handle the same.
+     * Logs AuditLogEntry. This method might be called after {@link #stop()},
+     * hence implementations need to handle the race condition.
      */
     void log(AuditLogEntry auditLogEntry);
 
     /**
      * Stop and cleanup any resources of IAuditLogger implementations. Please note that
-     * log() might be called even after stop() on AuditLogger.
+     * {@link #log(AuditLogEntry)} might be called after being stopped.
      */
     void stop();
+
+    /**
+     * @return the path to the logging files/directory if the implemenation writes out to the local filesystem,
+     * or null if the implementation doesn't log locally.
+     */
+    default Path path()
+    {
+        return null;
+    }
 }
