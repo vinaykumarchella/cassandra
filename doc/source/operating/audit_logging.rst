@@ -161,7 +161,7 @@ To use ``FileAuditLogger`` as a logger in AuditLogging, apart from setting the c
 .. code-block:: xml
 
     	<!-- Audit Logging (FileAuditLogger) rolling file appender to audit.log -->
-    	<appender name="FileAuditLoggerAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<appender name="AUDIT" class="ch.qos.logback.core.rolling.RollingFileAppender">
     	  <file>${cassandra.logdir}/audit/audit.log</file>
     	  <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
     	    <!-- rollover daily -->
@@ -178,5 +178,5 @@ To use ``FileAuditLogger`` as a logger in AuditLogging, apart from setting the c
 
       	<!-- Audit Logging additivity to redirect audt logging events to audit/audit.log -->
       	<logger name="org.apache.cassandra.audit" additivity="false" level="INFO">
-        	<appender-ref ref="FileAuditLoggerAppender"/>
+        	<appender-ref ref="AUDIT"/>
       	</logger>

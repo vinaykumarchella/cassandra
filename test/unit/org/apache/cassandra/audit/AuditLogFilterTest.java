@@ -168,4 +168,22 @@ public class AuditLogFilterTest
         Assert.assertFalse(isFiltered("a", includeSet, excludeSet));
         Assert.assertFalse(isFiltered("e", includeSet, excludeSet));
     }
+
+    @Test
+    public void isFiltered_NullInputs()
+    {
+        Set<String> includeSet = new HashSet<>();
+        Set<String> excludeSet = new HashSet<>();
+        Assert.assertFalse(isFiltered(null, includeSet, excludeSet));
+
+        includeSet.add("a");
+        includeSet.add("b");
+        includeSet.add("c");
+        Assert.assertTrue(isFiltered(null, includeSet, excludeSet));
+
+        includeSet = new HashSet<>();
+        excludeSet.add("a");
+        excludeSet.add("b");
+        Assert.assertFalse(isFiltered(null, includeSet, excludeSet));
+    }
 }
