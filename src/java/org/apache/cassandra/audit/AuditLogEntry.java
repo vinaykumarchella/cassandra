@@ -17,9 +17,7 @@
  */
 package org.apache.cassandra.audit;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.util.UUID;
 import javax.annotation.Nullable;
@@ -32,6 +30,7 @@ import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
+import org.apache.cassandra.thrift.ThriftClientState;
 import org.apache.cassandra.utils.FBUtilities;
 
 public class AuditLogEntry
@@ -267,6 +266,12 @@ public class AuditLogEntry
             return this;
         }
 
+        public Builder setScope(String scope)
+        {
+            this.scope = scope;
+            return this;
+        }
+
         public Builder setOperation(String operation)
         {
             this.operation = operation;
@@ -295,6 +300,40 @@ public class AuditLogEntry
             timestamp = timestamp > 0 ? timestamp : System.currentTimeMillis();
             return new AuditLogEntry(type, source, user, timestamp, batch, keyspace, scope, operation, options);
         }
+    }
+
+    /**
+     * Thrift helper methods for Audit Logging
+     */
+
+    public static AuditLogEntry getEvent(AuditLogEntryType type, ThriftClientState state)
+    {
+        return getEvent(type, null, null,  state);
+    }
+
+    public static AuditLogEntry getEvent(AuditLogEntryType type, String columnFamily, ThriftClientState state)
+    {
+        return getEvent(type, state.getRawKeyspace(), columnFamily, state);
+    }
+
+    public static AuditLogEntry getEvent(AuditLogEntryType type, String keyspace, String columnFamily, ThriftClientState state)
+    {
+        return getEventBuilder(type,keyspace,columnFamily,state).build();
+    }
+
+
+    public static AuditLogEntry getEvent(AuditLogEntryType type, ThriftClientState state, String operation)
+    {
+        return getEventBuilder(type, null, null,  state).setOperation(operation).build();
+    }
+
+    private static Builder getEventBuilder(AuditLogEntryType type, String keyspace, String columnFamily, ThriftClientState state)
+    {
+        Builder auditEntry = new Builder(state)
+                             .setType(type)
+                             .setKeyspace(keyspace)
+                             .setScope(columnFamily);
+        return auditEntry;
     }
 }
 

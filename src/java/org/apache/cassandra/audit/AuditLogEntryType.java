@@ -69,7 +69,47 @@ public enum AuditLogEntryType
     REQUEST_FAILURE(AuditLogEntryCategory.ERROR),
     LOGIN_ERROR(AuditLogEntryCategory.AUTH),
     UNAUTHORIZED_ATTEMPT(AuditLogEntryCategory.AUTH),
-    LOGIN_SUCCESS(AuditLogEntryCategory.AUTH);
+    LOGIN_SUCCESS(AuditLogEntryCategory.AUTH),
+
+
+    /**
+     * Thrift Audit Log Entry Types
+     */
+    GET(AuditLogEntryCategory.QUERY),
+    GET_SLICE(AuditLogEntryCategory.QUERY),
+    GET_COUNT(AuditLogEntryCategory.QUERY),
+    MULTIGET_SLICE(AuditLogEntryCategory.QUERY),
+    MULTIGET_COUNT(AuditLogEntryCategory.QUERY),
+    GET_RANGE_SLICES(AuditLogEntryCategory.QUERY),
+    GET_INDEXED_SLICES(AuditLogEntryCategory.QUERY),
+    GET_PAGED_SLICE(AuditLogEntryCategory.QUERY),
+    INSERT(AuditLogEntryCategory.DML),
+    REMOVE(AuditLogEntryCategory.DML),
+    ADD(AuditLogEntryCategory.DML),
+    REMOVE_COUNTER(AuditLogEntryCategory.DML),
+    BATCH_MUTATE(AuditLogEntryCategory.DML),
+    SET_KS(AuditLogEntryCategory.OTHER),
+    T_TRUNCATE(AuditLogEntryCategory.DDL),
+    COMPARE_AND_SET(AuditLogEntryCategory.DML),
+    DESC_KS(AuditLogEntryCategory.OTHER),
+    ADD_CF(AuditLogEntryCategory.DDL),
+    DROP_CF(AuditLogEntryCategory.DDL),
+    UPDATE_CF(AuditLogEntryCategory.DDL),
+    ADD_KS(AuditLogEntryCategory.DDL),
+    T_DROP_KS(AuditLogEntryCategory.DDL),
+    UPDATE_KS(AuditLogEntryCategory.DDL),
+    LOGIN(AuditLogEntryCategory.AUTH),
+    DESC_SCHEMA_VERSIONS(AuditLogEntryCategory.OTHER),
+    DESC_CLUSTER_NAME(AuditLogEntryCategory.OTHER),
+    DESC_VERSION(AuditLogEntryCategory.OTHER),
+    DESC_RING(AuditLogEntryCategory.OTHER),
+    DESC_LOCAL_RING(AuditLogEntryCategory.OTHER),
+    DESC_TOKEN_MAP(AuditLogEntryCategory.OTHER),
+    DESC_PARTITIONER(AuditLogEntryCategory.OTHER),
+    DESC_SPLITS(AuditLogEntryCategory.OTHER),
+    DESC_SNITCH(AuditLogEntryCategory.OTHER);
+
+
 
     private final AuditLogEntryCategory category;
 
