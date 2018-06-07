@@ -18,7 +18,6 @@
 package org.apache.cassandra.thrift;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
@@ -39,6 +38,9 @@ import com.google.common.primitives.Longs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.audit.AuditLogEntry;
+import org.apache.cassandra.audit.AuditLogEntryType;
+import org.apache.cassandra.audit.AuditLogManager;
 import org.apache.cassandra.auth.AuthenticatedUser;
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.config.CFMetaData;
@@ -91,6 +93,9 @@ public class CassandraServer implements Cassandra.Iface
      * RequestScheduler to perform the scheduling of incoming requests
      */
     private final IRequestScheduler requestScheduler;
+
+    private final AuditLogManager auditLogger = AuditLogManager.getInstance();
+    private boolean auditLogEnabled = auditLogger.isAuditingEnabled();
 
     public CassandraServer()
     {
@@ -322,11 +327,27 @@ public class CassandraServer implements Cassandra.Iface
             ClientState cState = state();
             String keyspace = cState.getKeyspace();
             state().hasColumnFamilyAccess(keyspace, column_parent.column_family, Permission.SELECT);
-            return getSliceInternal(keyspace, key, column_parent, System.currentTimeMillis(), predicate, consistency_level, cState);
+            List<ColumnOrSuperColumn> result = getSliceInternal(keyspace, key, column_parent, System.currentTimeMillis(), predicate, consistency_level, cState);
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_SLICE,column_parent.column_family,state()));
+            }
+            return result;
+
         }
         catch (RequestValidationException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_SLICE,column_parent.column_family,state()), e);
+            }
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e)
+        {
+            auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_SLICE, column_parent.column_family, state()), e);
+
+            throw e;
         }
         finally
         {
@@ -370,11 +391,29 @@ public class CassandraServer implements Cassandra.Iface
             ClientState cState = state();
             String keyspace = cState.getKeyspace();
             cState.hasColumnFamilyAccess(keyspace, column_parent.column_family, Permission.SELECT);
-            return multigetSliceInternal(keyspace, keys, column_parent, System.currentTimeMillis(), predicate, consistency_level, cState);
+            Map<ByteBuffer, List<ColumnOrSuperColumn>> result =  multigetSliceInternal(keyspace, keys, column_parent, System.currentTimeMillis(), predicate, consistency_level, cState);
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.MULTIGET_SLICE, column_parent.column_family, state()));
+            }
+            return result;
         }
         catch (RequestValidationException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.MULTIGET_SLICE, column_parent.column_family, state()), e);
+            }
+
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e)
+        {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.MULTIGET_SLICE, column_parent.column_family, state()), e);
+            }
+            throw e;
         }
         finally
         {
@@ -513,11 +552,27 @@ public class CassandraServer implements Cassandra.Iface
             if (tcolumns.isEmpty())
                 throw new NotFoundException();
             assert tcolumns.size() == 1;
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET, column_path.column_family, state()));
+            }
             return tcolumns.get(0);
         }
         catch (RequestValidationException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET, column_path.column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e)
+        {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET, column_path.column_family, state()), e);
+            }
+            throw e;
         }
         finally
         {
@@ -572,6 +627,11 @@ public class CassandraServer implements Cassandra.Iface
                                   : predicate.slice_range;
             SliceQueryFilter filter = toInternalFilter(cfs.metadata, column_parent, sliceRange);
 
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_COUNT, column_parent.column_family, state()));
+            }
+
             return QueryPagers.countPaged(keyspace,
                                           column_parent.column_family,
                                           key,
@@ -583,16 +643,38 @@ public class CassandraServer implements Cassandra.Iface
         }
         catch (IllegalArgumentException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_COUNT, column_parent.column_family, state()), e);
+            }
+
             // CASSANDRA-5701
             throw new InvalidRequestException(e.getMessage());
         }
         catch (RequestExecutionException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_COUNT, column_parent.column_family, state()), e);
+            }
+
             throw ThriftConversion.rethrow(e);
         }
         catch (RequestValidationException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_COUNT, column_parent.column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e)
+        {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_COUNT, column_parent.column_family, state()), e);
+            }
+            throw e;
         }
         finally
         {
@@ -645,11 +727,30 @@ public class CassandraServer implements Cassandra.Iface
 
             for (Map.Entry<ByteBuffer, List<ColumnOrSuperColumn>> cf : columnFamiliesMap.entrySet())
                 counts.put(cf.getKey(), cf.getValue().size());
+
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.MULTIGET_COUNT, column_parent.column_family, state()));
+            }
+
             return counts;
         }
         catch (RequestValidationException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.MULTIGET_COUNT, column_parent.column_family, state()), e);
+            }
+
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e)
+        {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.MULTIGET_COUNT, column_parent.column_family, state()), e);
+            }
+            throw e;
         }
         finally
         {
@@ -716,10 +817,27 @@ public class CassandraServer implements Cassandra.Iface
         try
         {
             internal_insert(key, column_parent, column, consistency_level);
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.INSERT, column_parent.column_family, state()));
+            }
+
         }
         catch (RequestValidationException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.INSERT, column_parent.column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e)
+        {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.INSERT, column_parent.column_family, state()), e);
+            }
+            throw e;
         }
         finally
         {
@@ -805,21 +923,47 @@ public class CassandraServer implements Cassandra.Iface
                                                    ThriftConversion.fromThrift(serial_consistency_level),
                                                    ThriftConversion.fromThrift(commit_consistency_level),
                                                    cState);
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.COMPARE_AND_SET, state().getRawKeyspace(), column_family, state()));
+            }
+
             return result == null
                  ? new CASResult(true)
                  : new CASResult(false).setCurrent_values(thriftifyColumnsAsColumns(result.getSortedColumns(), System.currentTimeMillis()));
         }
         catch (RequestTimeoutException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.COMPARE_AND_SET, state().getRawKeyspace(), column_family, state()), e);
+            }
+
             throw ThriftConversion.toThrift(e);
         }
         catch (RequestValidationException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.COMPARE_AND_SET, state().getRawKeyspace(), column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
         catch (RequestExecutionException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.COMPARE_AND_SET, state().getRawKeyspace(), column_family, state()), e);
+            }
             throw ThriftConversion.rethrow(e);
+        }
+        catch (TException e)
+        {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.COMPARE_AND_SET, state().getRawKeyspace(), column_family, state()), e);
+            }
+            throw e;
         }
         finally
         {
@@ -990,10 +1134,27 @@ public class CassandraServer implements Cassandra.Iface
         try
         {
             doInsert(consistency_level, createMutationList(consistency_level, mutation_map, true));
+            if(auditLogEnabled)
+            {
+                logBatch(getAuditEventsForBatch(mutation_map));
+            }
         }
         catch (RequestValidationException e)
         {
+            if(auditLogEnabled)
+            {
+                logBatch(getAuditEventsForBatch(mutation_map), ThriftConversion.toThrift(e));
+            }
+
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e)
+        {
+            if(auditLogEnabled)
+            {
+                logBatch(getAuditEventsForBatch(mutation_map), e);
+            }
+            throw e;
         }
         finally
         {
@@ -1023,10 +1184,27 @@ public class CassandraServer implements Cassandra.Iface
         try
         {
             doInsert(consistency_level, createMutationList(consistency_level, mutation_map, false), true);
+            if(auditLogEnabled)
+            {
+                logBatch(getAuditEventsForBatch(mutation_map));
+            }
+
         }
         catch (RequestValidationException e)
         {
+            if(auditLogEnabled)
+            {
+                logBatch(getAuditEventsForBatch(mutation_map), ThriftConversion.toThrift(e));
+            }
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e)
+        {
+            if(auditLogEnabled)
+            {
+                logBatch(getAuditEventsForBatch(mutation_map), e);
+            }
+            throw e;
         }
         finally
         {
@@ -1082,10 +1260,26 @@ public class CassandraServer implements Cassandra.Iface
         try
         {
             internal_remove(key, column_path, timestamp, consistency_level, false);
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.REMOVE, column_path.column_family, state()));
+            }
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.REMOVE, column_path.column_family, state()));
+            }
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e)
+        {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.REMOVE, column_path.column_family, state()), e);
+            }
+            throw e;
         }
         finally
         {
@@ -1140,13 +1334,28 @@ public class CassandraServer implements Cassandra.Iface
 
     public KsDef describe_keyspace(String keyspaceName) throws NotFoundException, InvalidRequestException
     {
-        validateLogin();
+        try
+        {
+            validateLogin();
 
-        KSMetaData ksm = Schema.instance.getKSMetaData(keyspaceName);
-        if (ksm == null)
-            throw new NotFoundException();
+            KSMetaData ksm = Schema.instance.getKSMetaData(keyspaceName);
+            if (ksm == null)
+                throw new NotFoundException();
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_KS, keyspaceName, null, state()));
+            }
 
-        return ksm.toThrift();
+            return ksm.toThrift();
+        }
+        catch (TException e)
+        {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_KS, keyspaceName, null, state()), e);
+            }
+            throw e;
+        }
     }
 
     public List<KeySlice> get_range_slices(ColumnParent column_parent, SlicePredicate predicate, KeyRange range, ConsistencyLevel consistency_level)
@@ -1217,20 +1426,44 @@ public class CassandraServer implements Cassandra.Iface
                 release();
             }
             assert rows != null;
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_RANGE_SLICES, column_parent.column_family, state()));
+            }
 
             return thriftifyKeySlices(rows, column_parent, predicate, now);
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_RANGE_SLICES, column_parent.column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
         catch (ReadTimeoutException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_RANGE_SLICES, column_parent.column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
         catch (org.apache.cassandra.exceptions.UnavailableException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_RANGE_SLICES, column_parent.column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e) {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_RANGE_SLICES, column_parent.column_family, state()), e);
+            }
+
+            throw e;
         }
         finally
         {
@@ -1282,8 +1515,8 @@ public class CassandraServer implements Cassandra.Iface
             else
             {
                 RowPosition end = range.end_key == null
-                                ? p.getTokenFactory().fromString(range.end_token).maxKeyBound(p)
-                                : RowPosition.ForKey.get(range.end_key, p);
+                                  ? p.getTokenFactory().fromString(range.end_token).maxKeyBound(p)
+                                  : RowPosition.ForKey.get(range.end_key, p);
                 bounds = new Bounds<RowPosition>(RowPosition.ForKey.get(range.start_key, p), end);
             }
 
@@ -1304,19 +1537,45 @@ public class CassandraServer implements Cassandra.Iface
             }
             assert rows != null;
 
-            return thriftifyKeySlices(rows, new ColumnParent(column_family), predicate, now);
+            List<KeySlice> result = thriftifyKeySlices(rows, new ColumnParent(column_family), predicate, now);
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_PAGED_SLICE, column_family, state()));
+            }
+
+            return result;
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_PAGED_SLICE, column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
         catch (ReadTimeoutException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_PAGED_SLICE, column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
         catch (org.apache.cassandra.exceptions.UnavailableException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_PAGED_SLICE, column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e)
+        {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_PAGED_SLICE, column_family, state()), e);
+            }
+            throw e;
         }
         finally
         {
@@ -1380,18 +1639,37 @@ public class CassandraServer implements Cassandra.Iface
                                                               index_clause.count);
 
             List<Row> rows = StorageProxy.getRangeSlice(command, consistencyLevel);
-            return thriftifyKeySlices(rows, column_parent, column_predicate, now);
+
+
+            List<KeySlice> result = thriftifyKeySlices(rows, column_parent, column_predicate, now);
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_INDEXED_SLICES, column_parent.column_family, state()));
+            }
+            return result;
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_INDEXED_SLICES, column_parent.column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
         catch (ReadTimeoutException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_INDEXED_SLICES, column_parent.column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
         catch (org.apache.cassandra.exceptions.UnavailableException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.GET_INDEXED_SLICES, column_parent.column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
         finally
@@ -1402,42 +1680,69 @@ public class CassandraServer implements Cassandra.Iface
 
     public List<KsDef> describe_keyspaces() throws TException, InvalidRequestException
     {
-        validateLogin();
-
-        Set<String> keyspaces = Schema.instance.getKeyspaces();
-        List<KsDef> ksset = new ArrayList<KsDef>(keyspaces.size());
-        for (String ks : keyspaces)
+        try
         {
-            try
+            validateLogin();
+
+            Set<String> keyspaces = Schema.instance.getKeyspaces();
+            List<KsDef> ksset = new ArrayList<KsDef>(keyspaces.size());
+            for (String ks : keyspaces)
             {
-                ksset.add(describe_keyspace(ks));
+                try
+                {
+                    ksset.add(describe_keyspace(ks));
+                }
+                catch (NotFoundException nfe)
+                {
+                    logger.info("Failed to find metadata for keyspace '{}'. Continuing... ", ks);
+                }
             }
-            catch (NotFoundException nfe)
-            {
-                logger.info("Failed to find metadata for keyspace '{}'. Continuing... ", ks);
-            }
+            return ksset;
         }
-        return ksset;
+        catch (TException e)
+        {
+            auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_KS, null, state()), e);
+            throw e;
+        }
     }
 
     public String describe_cluster_name() throws TException
     {
-        return DatabaseDescriptor.getClusterName();
+        String cluster_name =  DatabaseDescriptor.getClusterName();
+        if (auditLogEnabled)
+        {
+            auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_CLUSTER_NAME, null, state()));
+        }
+        return cluster_name;
     }
 
     public String describe_version() throws TException
     {
-        return cassandraConstants.VERSION;
+        String version = cassandraConstants.VERSION;
+        if (auditLogEnabled)
+        {
+            auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_VERSION, null, state()));
+        }
+        return version;
     }
 
     public List<TokenRange> describe_ring(String keyspace) throws InvalidRequestException
     {
         try
         {
-            return StorageService.instance.describeRing(keyspace);
+            List<TokenRange> ringOutput = StorageService.instance.describeRing(keyspace);
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_RING, keyspace, null, state()));
+            }
+            return ringOutput;
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_RING, keyspace, null, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
     }
@@ -1447,43 +1752,88 @@ public class CassandraServer implements Cassandra.Iface
     {
         try
         {
-            return StorageService.instance.describeLocalRing(keyspace);
+            List<TokenRange> local_ring = StorageService.instance.describeLocalRing(keyspace);
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_LOCAL_RING, keyspace, null, state()));
+            }
+            return local_ring;
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_LOCAL_RING, keyspace, null, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
     }
 
     public Map<String, String> describe_token_map() throws InvalidRequestException
     {
-        return StorageService.instance.getTokenToEndpointMap();
+        if (auditLogEnabled)
+        {
+            auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_TOKEN_MAP, null, state()));
+        }
+        Map<String, String> token_map = StorageService.instance.getTokenToEndpointMap();
+        return token_map;
     }
 
     public String describe_partitioner() throws TException
     {
-        return StorageService.getPartitioner().getClass().getName();
+        String partitionerName = StorageService.instance.getPartitionerName();
+        if (auditLogEnabled)
+        {
+            auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_PARTITIONER, null, state()));
+        }
+        return partitionerName;
     }
 
     public String describe_snitch() throws TException
     {
+        String snitch;
         if (DatabaseDescriptor.getEndpointSnitch() instanceof DynamicEndpointSnitch)
-            return ((DynamicEndpointSnitch)DatabaseDescriptor.getEndpointSnitch()).subsnitch.getClass().getName();
-        return DatabaseDescriptor.getEndpointSnitch().getClass().getName();
+        {
+            snitch = ((DynamicEndpointSnitch) DatabaseDescriptor.getEndpointSnitch()).subsnitch.getClass().getName();
+        }
+        else
+        {
+            snitch = DatabaseDescriptor.getEndpointSnitch().getClass().getName();
+        }
+        if (auditLogEnabled)
+        {
+            auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_SNITCH, null, state()));
+        }
+        return snitch;
     }
 
     @Deprecated
     public List<String> describe_splits(String cfName, String start_token, String end_token, int keys_per_split)
     throws TException, InvalidRequestException
     {
-        List<CfSplit> splits = describe_splits_ex(cfName, start_token, end_token, keys_per_split);
-        List<String> result = new ArrayList<String>(splits.size() + 1);
+        try
+        {
+            List<CfSplit> splits = describe_splits_ex(cfName, start_token, end_token, keys_per_split);
+            List<String> result = new ArrayList<String>(splits.size() + 1);
 
-        result.add(splits.get(0).getStart_token());
-        for (CfSplit cfSplit : splits)
-            result.add(cfSplit.getEnd_token());
+            result.add(splits.get(0).getStart_token());
+            for (CfSplit cfSplit : splits)
+                result.add(cfSplit.getEnd_token());
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_SPLITS, cfName, null, state()));
+            }
 
-        return result;
+            return result;
+        }
+        catch (TException e)
+        {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_SPLITS, cfName, null, state()), e);
+            }
+            throw e;
+        }
     }
 
     public List<CfSplit> describe_splits_ex(String cfName, String start_token, String end_token, int keys_per_split)
@@ -1498,10 +1848,18 @@ public class CassandraServer implements Cassandra.Iface
             List<CfSplit> result = new ArrayList<CfSplit>(splits.size());
             for (Pair<Range<Token>, Long> split : splits)
                 result.add(new CfSplit(split.left.left.toString(), split.left.right.toString(), split.right));
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_SPLITS, cfName, null, state()));
+            }
             return result;
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_SPLITS, cfName, null, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
     }
@@ -1512,9 +1870,17 @@ public class CassandraServer implements Cassandra.Iface
         {
             AuthenticatedUser user = DatabaseDescriptor.getAuthenticator().authenticate(auth_request.getCredentials());
             state().login(user);
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.LOGIN, state(), "Successful login for user - " + auth_request.getCredentials().get("username")));
+            }
         }
         catch (org.apache.cassandra.exceptions.AuthenticationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.LOGIN, state(), "Failed login attempt for user - " + auth_request.getCredentials().get("username")), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
     }
@@ -1561,10 +1927,20 @@ public class CassandraServer implements Cassandra.Iface
                 state().ensureIsSuper("Only superusers are allowed to add triggers.");
 
             MigrationManager.announceNewColumnFamily(cfm);
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.ADD_CF, cf_def.keyspace, cf_def.name, state()));
+            }
+
             return Schema.instance.getVersion().toString();
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.ADD_CF, cf_def.keyspace, cf_def.name, state()), e);
+            }
+
             throw ThriftConversion.toThrift(e);
         }
     }
@@ -1581,10 +1957,18 @@ public class CassandraServer implements Cassandra.Iface
             String keyspace = cState.getKeyspace();
             cState.hasColumnFamilyAccess(keyspace, column_family, Permission.DROP);
             MigrationManager.announceColumnFamilyDrop(keyspace, column_family);
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DROP_CF, column_family, null, state()));
+            }
             return Schema.instance.getVersion().toString();
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DROP_CF, column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
     }
@@ -1622,11 +2006,30 @@ public class CassandraServer implements Cassandra.Iface
                 cfDefs.add(cfm);
             }
             MigrationManager.announceNewKeyspace(KSMetaData.fromThrift(ks_def, cfDefs.toArray(new CFMetaData[cfDefs.size()])));
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.ADD_KS, ks_def.name, null, state()));
+            }
+
             return Schema.instance.getVersion().toString();
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.ADD_KS, ks_def.name, null, state()), e);
+            }
+
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e)
+        {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.ADD_KS, ks_def.name, null, state()), e);
+            }
+
+            throw e;
         }
     }
 
@@ -1641,10 +2044,19 @@ public class CassandraServer implements Cassandra.Iface
             state().hasKeyspaceAccess(keyspace, Permission.DROP);
 
             MigrationManager.announceKeyspaceDrop(keyspace);
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.T_DROP_KS, keyspace, null, state()));
+            }
+
             return Schema.instance.getVersion().toString();
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.T_DROP_KS, keyspace, null, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
     }
@@ -1666,11 +2078,24 @@ public class CassandraServer implements Cassandra.Iface
                 throw new InvalidRequestException("Keyspace update must not contain any column family definitions.");
 
             MigrationManager.announceKeyspaceUpdate(KSMetaData.fromThrift(ks_def));
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.UPDATE_KS, ks_def.name, null, state()));
+            }
+
             return Schema.instance.getVersion().toString();
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.UPDATE_KS, ks_def.name, null, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e) {
+            auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.UPDATE_KS, ks_def.name, null, state()), e);
+            throw e;
         }
     }
 
@@ -1701,11 +2126,28 @@ public class CassandraServer implements Cassandra.Iface
                 state().ensureIsSuper("Only superusers are allowed to add or remove triggers.");
 
             MigrationManager.announceColumnFamilyUpdate(cfm, true);
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.UPDATE_CF, cf_def.keyspace, cf_def.name, state()));
+            }
+
             return Schema.instance.getVersion().toString();
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.UPDATE_CF, cf_def.keyspace, cf_def.name, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e)
+        {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.UPDATE_CF, cf_def.keyspace, cf_def.name, state()), e);
+            }
+            throw e;
         }
     }
 
@@ -1731,6 +2173,11 @@ public class CassandraServer implements Cassandra.Iface
             try
             {
                 StorageProxy.truncateBlocking(cState.getKeyspace(), cfname);
+                if (auditLogEnabled)
+                {
+                    auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.T_TRUNCATE, cfname, state()));
+                }
+
             }
             finally
             {
@@ -1739,19 +2186,42 @@ public class CassandraServer implements Cassandra.Iface
         }
         catch (RequestValidationException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.T_TRUNCATE, cfname, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
         catch (org.apache.cassandra.exceptions.UnavailableException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.T_TRUNCATE, cfname, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
         catch (TimeoutException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.T_TRUNCATE, cfname, state()), e);
+            }
             throw new TimedOutException();
         }
         catch (IOException e)
         {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.T_TRUNCATE, cfname, state()), e);
+            }
             throw (UnavailableException) new UnavailableException().initCause(e);
+        }
+        catch (TException e) {
+            if (auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.T_TRUNCATE, cfname, state()), e);
+            }
+            throw e;
         }
         finally
         {
@@ -1764,9 +2234,17 @@ public class CassandraServer implements Cassandra.Iface
         try
         {
             state().setKeyspace(keyspace);
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.SET_KS, keyspace, null, state()));
+            }
         }
         catch (RequestValidationException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.SET_KS, keyspace, null, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
         }
     }
@@ -1774,6 +2252,10 @@ public class CassandraServer implements Cassandra.Iface
     public Map<String, List<String>> describe_schema_versions() throws TException, InvalidRequestException
     {
         logger.debug("checking schema agreement");
+        if(auditLogEnabled)
+        {
+            auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.DESC_SCHEMA_VERSIONS, null, state()));
+        }
         return StorageProxy.describeSchemaVersions();
     }
 
@@ -1824,10 +2306,27 @@ public class CassandraServer implements Cassandra.Iface
                 throw new InvalidRequestException(e.getMessage());
             }
             doInsert(consistency_level, Arrays.asList(new CounterMutation(mutation, ThriftConversion.fromThrift(consistency_level))));
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.ADD, column_parent.column_family, state()));
+            }
+
         }
         catch (RequestValidationException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.ADD, column_parent.column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e)
+        {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.ADD, column_parent.column_family, state()), e);
+            }
+            throw e;
         }
         finally
         {
@@ -1853,10 +2352,26 @@ public class CassandraServer implements Cassandra.Iface
         try
         {
             internal_remove(key, path, System.currentTimeMillis(), consistency_level, true);
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.REMOVE_COUNTER, path.column_family, state()));
+            }
+
         }
         catch (RequestValidationException e)
         {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.REMOVE_COUNTER, path.column_family, state()), e);
+            }
             throw ThriftConversion.toThrift(e);
+        }
+        catch (TException e) {
+            if(auditLogEnabled)
+            {
+                auditLogger.log(AuditLogEntry.getEvent(AuditLogEntryType.REMOVE_COUNTER, path.column_family, state()), e);
+            }
+            throw e;
         }
         finally
         {
@@ -2329,4 +2844,96 @@ public class CassandraServer implements Cassandra.Iface
             return updates;
         }
     }
+
+    private String getKeyspace()
+    {
+        String keyspace;
+        try
+        {
+            keyspace = state().getKeyspace();
+        }
+        catch (org.apache.cassandra.exceptions.InvalidRequestException e)
+        {
+            keyspace = null;
+        }
+        return keyspace;
+    }
+
+    private List<AuditLogEntry> getAuditEventsForBatch(Map<ByteBuffer, Map<String, List<Mutation>>> mutation_map)
+    throws org.apache.cassandra.thrift.InvalidRequestException, org.apache.cassandra.thrift.UnavailableException, TimedOutException
+    {
+        List<AuditLogEntry> events = new LinkedList<>();
+        UUID batchId;
+        String keyspace;
+
+        String cfName;
+        if (auditLogger.isAuditingEnabled())
+        {
+            batchId = UUID.randomUUID();
+            keyspace = getKeyspace();
+
+            for (Map.Entry<ByteBuffer, Map<String, List<Mutation>>> mutationEntry : mutation_map.entrySet())
+            {
+                AuditLogEntry.Builder auditEntryBuilder = new AuditLogEntry.Builder(state());
+                Map<String, List<Mutation>> columnFamilyToMutations = mutationEntry.getValue();
+                for (Map.Entry<String, List<Mutation>> columnFamilyMutations : columnFamilyToMutations.entrySet())
+                {
+                    cfName = columnFamilyMutations.getKey();
+                    for (Mutation m : columnFamilyMutations.getValue())
+                    {
+                        auditEntryBuilder.setBatch(batchId)
+                                  .setKeyspace(keyspace)
+                                  .setScope(cfName)
+                                  .setType(AuditLogEntryType.BATCH_MUTATE);
+
+                        if (m.isSetDeletion())
+                        {
+                            auditEntryBuilder.setType(AuditLogEntryType.REMOVE);
+                        }
+                        else if (m.column_or_supercolumn.isSetColumn())
+                        {
+                            auditEntryBuilder.setType(AuditLogEntryType.INSERT);
+                        }
+                        else if (m.column_or_supercolumn.isSetCounter_column())
+                        {
+                            auditEntryBuilder.setType(AuditLogEntryType.ADD);
+                        }
+
+                        AuditLogEntry auditLogEntry = auditEntryBuilder.build();
+                        if (auditLogEntry.getType()!=null)
+                        {
+                            events.add(auditLogEntry);
+                        }
+                        else
+                        {
+                            logger.warn(String.format("Unable to identify AuditLogEntryType of mutation in batch for %s.%s, skipping audit log", keyspace, cfName));
+                        }
+                    }
+                }
+            }
+        }
+        return events;
+    }
+
+    private void logBatch(List<AuditLogEntry> auditEventsForBatch)
+    {
+        for (AuditLogEntry auditLogEntry : auditEventsForBatch)
+        {
+            auditLogger.log(auditLogEntry);
+        }
+    }
+
+
+    private void logBatch(List<AuditLogEntry> events, TException e)
+    {
+        if(null != events)
+        {
+            for (AuditLogEntry event : events)
+            {
+                auditLogger.log(event, e);
+            }
+        }
+    }
+
+
 }
