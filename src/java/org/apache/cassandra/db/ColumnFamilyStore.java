@@ -35,6 +35,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
 
+import org.apache.cassandra.exceptions.CircuitBreakerRowLimitException;
 import org.apache.cassandra.io.FSWriteError;
 import org.json.simple.*;
 import org.slf4j.Logger;
@@ -2261,6 +2262,9 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         int total = 0, matched = 0;
         boolean ignoreTombstonedPartitions = filter.ignoreTombstonedPartitions();
 
+        // Prevent queries from retaining too many rows on heap and OOMing Cassandra
+        int circuitBreakerMaxRows = DatabaseDescriptor.getCircuitBreakerRowFilterLimit();
+
         try
         {
             while (rowIterator.hasNext() && matched < filter.maxRows() && columnsCount < filter.maxColumns())
@@ -2295,6 +2299,13 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 }
 
                 rows.add(new Row(rawRow.key, data));
+                if (rows.size() > circuitBreakerMaxRows && !(Keyspace.SYSTEM_KS.startsWith(keyspace.getName())))
+                {
+                    logger.error("Query exceeded configured circuit_breaker_row_filter_limit of {}. " +
+                                 "max(rows, columns) = ({}, {}) requested. Please use smaller page sizes.",
+                                 circuitBreakerMaxRows, filter.maxRows(), filter.maxColumns());
+                    throw new CircuitBreakerRowLimitException();
+                }
                 if (!ignoreTombstonedPartitions || !data.hasOnlyTombstones(filter.timestamp))
                     matched++;
 

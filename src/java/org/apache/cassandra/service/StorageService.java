@@ -4520,6 +4520,18 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         DatabaseDescriptor.setTombstoneFailureThreshold(threshold);
     }
 
+    @Override
+    public int getCircuitBreakerRowFilterLimit()
+    {
+        return DatabaseDescriptor.getCircuitBreakerRowFilterLimit();
+    }
+
+    @Override
+    public void setCircuitBreakerRowFilterLimit(int rowFilterLimit)
+    {
+        DatabaseDescriptor.setCircuitBreakerRowFilterLimit(rowFilterLimit);
+    }
+
     public void setHintedHandoffThrottleInKB(int throttleInKB)
     {
         DatabaseDescriptor.setHintedHandoffThrottleInKB(throttleInKB);

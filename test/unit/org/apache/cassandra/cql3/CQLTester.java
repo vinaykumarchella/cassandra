@@ -396,6 +396,22 @@ public abstract class CQLTester
         }
     }
 
+    protected UntypedResultSet executeWithPaging(String query, int pageSize, Object... values) throws Throwable
+    {
+        try
+        {
+            query = currentTable() == null ? query : String.format(query, KEYSPACE + "." + currentTable());
+            logger.info("Executing: {} with pageSize {} and values {}", query, pageSize, formatAllValues(values));
+            return QueryProcessor.executeInternalWithPaging(query, pageSize, transformValues(values));
+        }
+        catch (RuntimeException e)
+        {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            logger.info("Got error: {}", cause.getMessage() == null ? cause.toString() : cause.getMessage());
+            throw cause;
+        }
+    }
+
     protected void assertRows(UntypedResultSet result, Object[]... rows)
     {
         if (result == null)
