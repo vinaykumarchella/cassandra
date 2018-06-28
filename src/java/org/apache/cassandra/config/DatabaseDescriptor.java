@@ -69,7 +69,6 @@ import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.scheduler.IRequestScheduler;
 import org.apache.cassandra.scheduler.NoScheduler;
 import org.apache.cassandra.service.CacheService;
-import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.cassandra.utils.memory.HeapPool;
@@ -1168,6 +1167,16 @@ public class DatabaseDescriptor
     public static void setTombstoneFailureThreshold(int threshold)
     {
         conf.tombstone_failure_threshold = threshold;
+    }
+
+    public static int getCircuitBreakerRowFilterLimit()
+    {
+        return conf.circuit_breaker_row_filter_limit;
+    }
+
+    public static void setCircuitBreakerRowFilterLimit(int rowFilterLimit)
+    {
+        conf.circuit_breaker_row_filter_limit = rowFilterLimit;
     }
 
     public static boolean getCommitLogSegmentRecyclingEnabled()
