@@ -30,6 +30,8 @@ import java.util.concurrent.TimeoutException;
 import javax.management.NotificationEmitter;
 import javax.management.openmbean.TabularData;
 
+import org.apache.cassandra.exceptions.ConfigurationException;
+
 public interface StorageServiceMBean extends NotificationEmitter
 {
     /**
@@ -577,4 +579,8 @@ public interface StorageServiceMBean extends NotificationEmitter
 
     /** Sets the hinted handoff throttle in kb per second, per delivery thread. */
     public void setHintedHandoffThrottleInKB(int throttleInKB);
+    public void disableAuditLog();
+    public void enableAuditLog(String loggerName, String includedKeyspaces, String excludedKeyspaces, String includedCategories, String excludedCategories, String includedUsers, String excludedUsers) throws ConfigurationException;
+    public boolean isAuditLogEnabled();
+
 }

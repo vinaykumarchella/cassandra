@@ -821,3 +821,16 @@ inter_dc_tcp_nodelay: false
 # Adjust the threshold based on your application throughput requirement
 # By default, Cassandra logs GC Pauses greater than 200 ms at INFO level
 # gc_warn_threshold_in_ms: 1000
+
+# Audit logging - Logs every incoming CQL command request, authentication to a node. See the docs
+# on audit_logging for full details about the various configuration options.
+audit_logging_options:
+    enabled: false
+    logger: BinAuditLogger
+    # audit_logs_dir:
+    # included_keyspaces: 
+    # excluded_keyspaces:
+    # included_categories:
+    # excluded_categories:
+    # included_users:
+    # excluded_users:

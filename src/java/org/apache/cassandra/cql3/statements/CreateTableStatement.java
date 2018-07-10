@@ -29,6 +29,9 @@ import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.Schema;
+import org.apache.cassandra.audit.AuditLogEntryType;
+import org.apache.cassandra.auth.*;
+import org.apache.cassandra.config.*;
 import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.db.composites.*;
 import org.apache.cassandra.db.ColumnFamilyType;
@@ -436,5 +439,10 @@ public class CreateTableStatement extends SchemaAlteringStatement
         {
             useCompactStorage = true;
         }
+    }
+    @Override
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.CREATE_TABLE, keyspace(), cfName.getColumnFamily());
     }
 }

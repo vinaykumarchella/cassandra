@@ -17,6 +17,7 @@
  */
 package org.apache.cassandra.cql3.statements;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.KSMetaData;
@@ -93,5 +94,11 @@ public class AlterKeyspaceStatement extends SchemaAlteringStatement
     public Event.SchemaChange changeEvent()
     {
         return new Event.SchemaChange(Event.SchemaChange.Change.UPDATED, keyspace());
+    }
+
+    @Override
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.ALTER_KEYSPACE, keyspace(), null);
     }
 }

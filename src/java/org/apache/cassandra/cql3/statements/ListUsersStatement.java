@@ -17,6 +17,8 @@
  */
 package org.apache.cassandra.cql3.statements;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
+import org.apache.cassandra.audit.IAuditLogContext;
 import org.apache.cassandra.auth.Auth;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.db.ConsistencyLevel;
@@ -43,5 +45,10 @@ public class ListUsersStatement extends AuthenticationStatement
         return QueryProcessor.process(String.format("SELECT * FROM %s.%s", Auth.AUTH_KS, Auth.USERS_CF),
                                       ConsistencyLevel.QUORUM,
                                       QueryState.forInternalCalls());
+    }
+
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.LIST_USERS);
     }
 }

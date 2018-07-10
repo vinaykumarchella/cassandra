@@ -17,6 +17,8 @@
  */
 package org.apache.cassandra.cql3.statements;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
+import org.apache.cassandra.audit.IAuditLogContext;
 import org.apache.cassandra.auth.Auth;
 import org.apache.cassandra.auth.AuthenticatedUser;
 import org.apache.cassandra.auth.IAuthenticator;
@@ -88,5 +90,10 @@ public class AlterUserStatement extends AuthenticationStatement
         if (superuser != null)
             Auth.insertUser(username, superuser.booleanValue());
         return null;
+    }
+
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.ALTER_ROLE);
     }
 }

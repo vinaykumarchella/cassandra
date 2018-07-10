@@ -17,6 +17,8 @@
  */
 package org.apache.cassandra.cql3.statements;
 
+import org.apache.cassandra.audit.AuditLogEntryType;
+import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.exceptions.RequestValidationException;
@@ -73,5 +75,11 @@ public class DropKeyspaceStatement extends SchemaAlteringStatement
     public Event.SchemaChange changeEvent()
     {
         return new Event.SchemaChange(Event.SchemaChange.Change.DROPPED, keyspace());
+    }
+
+    @Override
+    public AuditLogContext getAuditLogContext()
+    {
+        return new AuditLogContext(AuditLogEntryType.DROP_KEYSPACE, keyspace());
     }
 }

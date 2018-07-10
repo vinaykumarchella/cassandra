@@ -31,6 +31,7 @@ import org.apache.cassandra.config.EncryptionOptions.ServerEncryptionOptions;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.io.util.NativeAllocator;
 import org.apache.cassandra.utils.FBUtilities;
+import org.apache.cassandra.audit.AuditLogOptions;
 
 /**
  * A class that contains configuration properties for the cassandra node it runs within.
@@ -250,6 +251,7 @@ public class Config
      */
     public static final int otc_coalescing_window_us_default = 200;
     public int otc_coalescing_window_us = otc_coalescing_window_us_default;
+    public volatile AuditLogOptions audit_logging_options = new AuditLogOptions();
 
     public static boolean getOutboundBindAny()
     {
