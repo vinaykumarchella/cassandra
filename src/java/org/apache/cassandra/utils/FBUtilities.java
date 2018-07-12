@@ -641,7 +641,7 @@ public class FBUtilities
      */
     public static InetAddressAndPort getBroadcastAddressAndPort()
     {
-        if (broadcastInetAddress == null)
+        if (broadcastInetAddressAndPort == null)
         {
             broadcastInetAddressAndPort = InetAddressAndPort.getByAddress(getJustBroadcastAddress());
         }
