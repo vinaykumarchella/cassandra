@@ -33,8 +33,15 @@ if [ -d $CASSANDRA_HOME/build ] ; then
     #cassandra_bin="$CASSANDRA_HOME/build/classes/main"
     cassandra_bin=`ls -1 $CASSANDRA_HOME/build/apache-cassandra*.jar`
     cassandra_bin="$cassandra_bin:$CASSANDRA_HOME/build/classes/stress"
+    # Set the classpath for sidecar classes
+    cassandra_bin="$CLASSPATH:$CASSANDRA_HOME/build/classes/sidecar"
     CLASSPATH="$CLASSPATH:$cassandra_bin"
 fi
+
+# Set the classpath for sidecar deps
+for jar in "$CASSANDRA_HOME"/tools/sidecar/lib/*.jar; do
+    CLASSPATH="$CLASSPATH:$jar"
+done
 
 # the default location for commitlogs, sstables, and saved caches
 # if not set in cassandra.yaml
