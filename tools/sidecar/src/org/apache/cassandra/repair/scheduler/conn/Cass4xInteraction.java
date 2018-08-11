@@ -303,7 +303,7 @@ public class Cass4xInteraction extends CassandraInteractionBase
         try
         {
             return (ssProxy.isGossipRunning() &&
-                    ssProxy.isNativeTransportRunning())
+                    ssProxy.isNativeTransportRunning());
         }
         catch (Exception e)
         {
