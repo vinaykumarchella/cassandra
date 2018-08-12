@@ -21,6 +21,8 @@ import java.net.InetAddress;
 import java.util.Date;
 import java.util.Optional;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.Token;
 
@@ -33,6 +35,7 @@ public class RepairHost
     private Date lastRepairTime;
     private Token firstToken;
 
+    @VisibleForTesting
     public RepairHost(InetAddress broadcastAddress, String datacenter, String rack, String nodeId)
     {
         this.broadcastAddress = broadcastAddress;
@@ -41,12 +44,13 @@ public class RepairHost
         this.nodeId = nodeId;
     }
 
-    // From Datastax driver host
+    // From Java driver host object
     public RepairHost(Host host)
     {
         this.broadcastAddress = host.getBroadcastAddress();
         this.datacenter = host.getDatacenter();
         this.rack = host.getRack();
+        this.nodeId = host.getHostId().toString();
 
         Optional<Token> firstToken = host.getTokens().stream().findFirst();
         firstToken.ifPresent(token -> this.firstToken = token);
@@ -57,32 +61,9 @@ public class RepairHost
         return broadcastAddress;
     }
 
-    public RepairHost setBroadcastAddress(InetAddress broadcastAddress)
-    {
-        this.broadcastAddress = broadcastAddress;
-        return this;
-    }
-
-    public String getDatacenter()
-    {
-        return datacenter;
-    }
-
-    public RepairHost setDatacenter(String datacenter)
-    {
-        this.datacenter = datacenter;
-        return this;
-    }
-
     public String getRack()
     {
         return rack;
-    }
-
-    public RepairHost setRack(String rack)
-    {
-        this.rack = rack;
-        return this;
     }
 
     public String getNodeId()
@@ -90,31 +71,9 @@ public class RepairHost
         return nodeId;
     }
 
-    public RepairHost setNodeId(String nodeId)
-    {
-        this.nodeId = nodeId;
-        return this;
-    }
-
-    public Optional<Date> getLastRepairTime()
-    {
-        return Optional.ofNullable(lastRepairTime);
-    }
-
-    public RepairHost setLastRepairTime(Date lastRepairTime)
-    {
-        this.lastRepairTime = lastRepairTime;
-        return this;
-    }
-
     public Token getFirstToken()
     {
         return firstToken;
     }
 
-    public RepairHost setFirstToken(Token firstToken)
-    {
-        this.firstToken = firstToken;
-        return this;
-    }
 }
