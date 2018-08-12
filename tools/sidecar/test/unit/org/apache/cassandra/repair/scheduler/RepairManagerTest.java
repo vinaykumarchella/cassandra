@@ -18,49 +18,18 @@
 
 package org.apache.cassandra.repair.scheduler;
 
-import java.util.stream.IntStream;
-
-import com.datastax.driver.core.BoundStatement;
-import com.datastax.driver.core.PreparedStatement;
 import org.apache.cassandra.repair.RepairParallelism;
 import org.apache.cassandra.repair.scheduler.entity.RepairOptions;
 import org.apache.cassandra.repair.scheduler.entity.RepairType;
 import org.apache.cassandra.repair.scheduler.entity.TableRepairConfig;
-import org.cassandraunit.CQLDataLoader;
-import org.cassandraunit.dataset.cql.ClassPathCQLDataSet;
 
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 public class RepairManagerTest extends EmbeddedUnitTestBase
 {
-    protected void loadDataset(int count)
-    {
-        CQLDataLoader loader = new CQLDataLoader(getSession());
-
-        ClassPathCQLDataSet truncate = new ClassPathCQLDataSet(
-        "truncateRepairSchedulerTables.cql", false, false, "system_distributed_test");
-        loader.load(truncate);
-
-        ClassPathCQLDataSet repairManagerTables = new ClassPathCQLDataSet("setupRepairManagerTestTables.cql", true, false, "test_repair");
-        loader.load(repairManagerTables);
-
-        PreparedStatement subRangeStatement = getSession().prepare("INSERT INTO test_repair.subrange_test (key, value) VALUES (?, ?)");
-        PreparedStatement incrementalStatement = getSession().prepare("INSERT INTO test_repair.incremental_test (key, value) VALUES (?, ?)");
-
-
-        IntStream.rangeClosed(1, count).parallel()
-                 .mapToObj(Integer::toString).forEach(v -> {
-            BoundStatement boundStmt = subRangeStatement.bind(v, v);
-            BoundStatement boundIncStatement = incrementalStatement.bind(v, v);
-            getSession().execute(boundStmt);
-            getSession().execute(boundIncStatement);
-        });
-    }
-
     @Before
-    public void setup() throws InterruptedException
+    public void setupManager() throws InterruptedException
     {
         loadDataset(30000);
         RepairDaoManager daoManager = new RepairDaoManager(getContext());
