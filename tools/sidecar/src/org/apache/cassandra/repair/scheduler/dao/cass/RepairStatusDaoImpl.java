@@ -41,11 +41,9 @@ import org.joda.time.DateTime;
 
 import static com.datastax.driver.core.querybuilder.QueryBuilder.eq;
 
-
 public class RepairStatusDaoImpl implements IRepairStatusDao
 {
     private static final Logger logger = LoggerFactory.getLogger(RepairStatusDaoImpl.class);
-
     private final CassDaoUtil daoUtil;
     private final RepairSchedulerConfig config;
     private final CassandraInteraction cassInteraction;
@@ -57,8 +55,7 @@ public class RepairStatusDaoImpl implements IRepairStatusDao
         cassInteraction = context.getCassInteraction();
     }
 
-    @Override
-    public List<RepairMetadata> getCurrentlyRunningRepairs(int repairId, String nodeId)
+    private List<RepairMetadata> getCurrentlyRunningRepairs(int repairId, String nodeId)
     {
         List<RepairMetadata> currRunRepair = new LinkedList<>();
         List<RepairMetadata> repairHistory = getRepairHistory(repairId, nodeId);
@@ -110,9 +107,7 @@ public class RepairStatusDaoImpl implements IRepairStatusDao
     @Override
     public List<RepairMetadata> getRepairHistory(int repairId, String keyspace, String table, String nodeId)
     {
-
         List<RepairMetadata> res = new LinkedList<>();
-
         try
         {
 
@@ -167,18 +162,15 @@ public class RepairStatusDaoImpl implements IRepairStatusDao
     }
 
     @Override
-    public List<RepairMetadata> getRepairHistory(int repaidId, String nodeId)
+    public List<RepairMetadata> getRepairHistory(int repairId, String nodeId)
     {
         List<RepairMetadata> res = new LinkedList<>();
-
-
         Statement selectQuery = QueryBuilder.select().from(config.getRepairKeyspace(), config.getRepairStatusTableName())
                                             .where(QueryBuilder.eq("cluster_name", cassInteraction.getClusterName()))
-                                            .and(QueryBuilder.eq("repair_id", repaidId))
+                                            .and(QueryBuilder.eq("repair_id", repairId))
                                             .and(QueryBuilder.eq("node_id", nodeId));
 
         ResultSet results = daoUtil.execSelectStmtRepairDb(selectQuery);
-
 
         List<Row> allRows = results.all();
 
@@ -210,14 +202,10 @@ public class RepairStatusDaoImpl implements IRepairStatusDao
     {
         List<RepairMetadata> res = new LinkedList<>();
 
-
         Statement selectQuery = QueryBuilder.select().from(config.getRepairKeyspace(), config.getRepairStatusTableName()).where(QueryBuilder.eq("cluster_name", cassInteraction.getClusterName())).and(QueryBuilder.eq("repair_id", repairId));
 
         ResultSet results = daoUtil.execSelectStmtRepairDb(selectQuery);
-
-
         List<Row> allRows = results.all();
-
         for (Row row : allRows)
         {
             RepairMetadata repairMetadata = new RepairMetadata();
@@ -285,7 +273,6 @@ public class RepairStatusDaoImpl implements IRepairStatusDao
 
             res.add(repairMetadata);
         }
-
         return res;
     }
 
@@ -293,10 +280,8 @@ public class RepairStatusDaoImpl implements IRepairStatusDao
     public boolean markRepairCancelled(int repairId, String nodeId)
     {
         logger.info("Marking Repair Cancelled for repairId: {} on all tables", repairId);
-
         try
         {
-
             BatchStatement batch = new BatchStatement();
             List<RepairMetadata> currentlyRunningRepairs = getCurrentlyRunningRepairs(repairId, nodeId);
             for (RepairMetadata runningRepair : currentlyRunningRepairs)

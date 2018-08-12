@@ -17,24 +17,22 @@
  */
 package org.apache.cassandra.repair.scheduler.dao.cass;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.apache.cassandra.repair.scheduler.EmbeddedUnitTestBase;
 import org.apache.cassandra.repair.scheduler.entity.RepairHost;
 import org.apache.cassandra.repair.scheduler.entity.RepairMetadata;
 import org.apache.cassandra.repair.scheduler.entity.TableRepairConfig;
 import org.apache.cassandra.utils.GuidGenerator;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.stream.Collectors;
-
 public class BaseDaoUnitTest extends EmbeddedUnitTestBase
 {
     public static final String TEST_CLUSTER_NAME = "Test Cluster";
-    private static final int MASK = (-1) >>> 1; // all ones except the sign bit
     int repairId = getRandomRepairId();//-1;
 
     List<RepairHost> generateHosts(int n)
@@ -46,7 +44,10 @@ public class BaseDaoUnitTest extends EmbeddedUnitTestBase
             {
                 RepairHost host = new RepairHost(InetAddress.getByName("127.0.0." + i), "dc1", "rack1", GuidGenerator.guid());
                 allHosts.add(host);
-            } catch (UnknownHostException e) { }
+            }
+            catch (UnknownHostException e)
+            {
+            }
         }
         return allHosts;
     }
@@ -59,16 +60,6 @@ public class BaseDaoUnitTest extends EmbeddedUnitTestBase
     Map<String, String> generateEndpointToHostId(List<RepairHost> hosts)
     {
         return hosts.stream().collect(Collectors.toMap(n -> n.getBroadcastAddress().getHostName(), RepairHost::getNodeId));
-    }
-
-    int getRandomRepairId()
-    {
-        return new Random().nextInt() & MASK;
-    }
-
-    int nextRandomPositiveInt()
-    {
-        return new Random().nextInt() & MASK;
     }
 
     RepairMetadata generateRepairMetadata(String hostId)
@@ -90,8 +81,6 @@ public class BaseDaoUnitTest extends EmbeddedUnitTestBase
                       .setEndToken("ENDToken_" + nextRandomPositiveInt())
                       .setRepairConfig(repairConfig);
 
-
         return repairMetadata;
     }
-
 }

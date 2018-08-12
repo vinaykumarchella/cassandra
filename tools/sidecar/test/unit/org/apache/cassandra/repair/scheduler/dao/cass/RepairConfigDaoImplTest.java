@@ -35,7 +35,7 @@ import java.util.List;
 
 public class RepairConfigDaoImplTest extends EmbeddedUnitTestBase
 {
-    IRepairConfigDao repairConfigDao;
+    private IRepairConfigDao repairConfigDao;
 
     @Before
     public void beforeMethod()
@@ -51,19 +51,18 @@ public class RepairConfigDaoImplTest extends EmbeddedUnitTestBase
                .setType(RepairType.fromString("FULL"))
                .setParallelism(RepairParallelism.fromName("sequential"));
 
-
         testConfig.setKeyspace("test_ks")
                   .setName("test_tbl")
                   .setRepairOptions(options)
                   .setInterRepairDelayMinutes(123);
 
-        repairConfigDao.saveRepairConfig("UNITTEST", "default", testConfig);
+        repairConfigDao.saveRepairConfig("default", testConfig);
     }
 
     @Test
     public void getRepairConfigs()
     {
-        List<TableRepairConfig> repairConfigs = repairConfigDao.getRepairConfigs("UNITTEST", "default");
+        List<TableRepairConfig> repairConfigs = repairConfigDao.getRepairConfigs( "default");
         Assert.assertEquals(1, repairConfigs.size());
         Assert.assertEquals(RepairParallelism.SEQUENTIAL, repairConfigs.get(0).getRepairOptions().getParallelism());
         Assert.assertEquals(RepairSplitStrategy.Strategy.PARTITION, repairConfigs.get(0).getRepairOptions().getSplitStrategy().getStrategy());

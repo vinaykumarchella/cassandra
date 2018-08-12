@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableMap;
 import org.slf4j.Logger;
@@ -38,7 +37,6 @@ import org.apache.cassandra.repair.scheduler.config.RepairSchedulerConfig;
 import org.apache.cassandra.repair.scheduler.config.RepairSchedulerContext;
 import org.apache.cassandra.repair.scheduler.conn.CassandraInteraction;
 import org.apache.cassandra.repair.scheduler.dao.model.IRepairSequenceDao;
-import org.apache.cassandra.repair.scheduler.entity.ClusterRepairStatus;
 import org.apache.cassandra.repair.scheduler.entity.RepairHost;
 import org.apache.cassandra.repair.scheduler.entity.RepairSequence;
 import org.apache.cassandra.repair.scheduler.entity.RepairStatus;
@@ -46,9 +44,7 @@ import org.joda.time.DateTime;
 
 public class RepairSequenceDaoImpl implements IRepairSequenceDao
 {
-
     private static final Logger logger = LoggerFactory.getLogger(RepairSequenceDaoImpl.class);
-
     private final CassDaoUtil daoUtil;
     private final RepairSchedulerConfig config;
     private final CassandraInteraction cassInteraction;
@@ -58,25 +54,6 @@ public class RepairSequenceDaoImpl implements IRepairSequenceDao
         this.daoUtil = daoUtil;
         this.config = context.getConfig();
         cassInteraction = context.getCassInteraction();
-    }
-
-    @Override
-    public ClusterRepairStatus getLatestRepairId()
-    {
-        ClusterRepairStatus crs = new ClusterRepairStatus();
-        Statement selectQuery = QueryBuilder.select()
-                                            .from(config.getRepairKeyspace(), config.getRepairSequenceTableName())
-                                            .where(QueryBuilder.eq("cluster_name", cassInteraction.getClusterName()))
-                                            .limit(1);
-
-        Row row = daoUtil.execSelectStmtRepairDb(selectQuery).one();
-        if (row != null)
-        {
-            return crs.setRepairId(row.getInt("repair_id"))
-                      .setRepairStatus(row.getString("status"));
-        }
-
-        return crs;
     }
 
     @Override
@@ -114,12 +91,13 @@ public class RepairSequenceDaoImpl implements IRepairSequenceDao
                                                 .and(QueryBuilder.eq("repair_id", repairId))
                                                 .and(QueryBuilder.eq("seq", seq));
             daoUtil.execUpsertStmtRepairDb(updateQuery);
+            return true;
         }
         catch (Exception e)
         {
             logger.error("Exception in marking node repair status completed", e);
+            return false;
         }
-        return true;
     }
 
     @Override
@@ -177,7 +155,6 @@ public class RepairSequenceDaoImpl implements IRepairSequenceDao
     public SortedSet<RepairSequence> getRepairSequence(int repairId)
     {
         TreeSet<RepairSequence> repairSeqLst = new TreeSet<>();
-
         Statement selectQuery = QueryBuilder.select()
                                             .from(config.getRepairKeyspace(), config.getRepairSequenceTableName())
                                             .where(QueryBuilder.eq("cluster_name", cassInteraction.getClusterName()))
@@ -194,8 +171,6 @@ public class RepairSequenceDaoImpl implements IRepairSequenceDao
     @Override
     public boolean updateHeartBeat(int repairId, int seq)
     {
-//        logger.debug("Updating heart beat for repair Id: {}, Seq: {}", repairId, seq);
-
         try
         {
             Statement updateQuery = QueryBuilder.update(config.getRepairKeyspace(), config.getRepairSequenceTableName())
@@ -204,51 +179,20 @@ public class RepairSequenceDaoImpl implements IRepairSequenceDao
 
                                                 .where(QueryBuilder.eq("cluster_name", cassInteraction.getClusterName())).and(QueryBuilder.eq("repair_id", repairId)).and(QueryBuilder.eq("seq", seq));
 
-            ResultSet rs = daoUtil.execUpsertStmtRepairDb(updateQuery);
+            daoUtil.execUpsertStmtRepairDb(updateQuery);
+            return true;
         }
         catch (Exception e)
         {
             logger.error("Exception in updating heart beat for repair Id: {}, Seq: {}", repairId, seq, e);
+            return false;
         }
-
-        return true;
-    }
-
-    /**
-     * @param repairId The global repairId to search for stuck RepairSequence elements
-     * @return An optional RepairSequence element which is stuck. If no element is returned it means nothing is stuck
-     */
-    @Override
-    public Optional<RepairSequence> getStuckRepairSequence(int repairId)
-    {
-        logger.info("Getting latest in progress heartbeat for repair Id: {}", repairId);
-        try
-        {
-            SortedSet<RepairSequence> repairSeqSet = getRepairSequence(repairId);
-            long minutes = TimeUnit.MINUTES.convert(config.getRepairProcessTimeoutInS(), TimeUnit.SECONDS);
-            for (RepairSequence repairSequence : repairSeqSet)
-            {
-                if (repairSequence.getStatus().isStarted() && repairSequence.isLastHeartbeatBeforeMin(minutes))
-                {
-                    logger.debug("Found at least one latest in-progress heartbeat whose last sent time is before {} minutes ago - [{}]",
-                                 minutes, repairSequence);
-                    return Optional.of(repairSequence);
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            logger.error("Exception in finding if repair is stuck on cluster for repair Id:{}", repairId, e);
-        }
-
-        return Optional.empty();
     }
 
     @Override
     public boolean cancelRepairOnNode(int repairId, Integer seq)
     {
         logger.info("Cancelling the repair on node - repairId: {}, Seq: {}", repairId, seq);
-
         try
         {
             Statement updateQuery = QueryBuilder.update(config.getRepairKeyspace(), config.getRepairSequenceTableName())
@@ -259,13 +203,13 @@ public class RepairSequenceDaoImpl implements IRepairSequenceDao
 
             daoUtil.execUpsertStmtRepairDb(updateQuery);
             logger.info("Cancelled repair on node - repairId: {}, Seq: {}", repairId, seq);
+            return true;
         }
         catch (Exception e)
         {
             logger.error("Exception in cancelling the repair on node- repair Id: {}, Seq: {}", repairId, seq, e);
+            return false;
         }
-
-        return true;
     }
 
 

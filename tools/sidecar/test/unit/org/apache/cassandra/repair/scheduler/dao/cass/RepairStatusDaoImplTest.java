@@ -18,28 +18,24 @@
 
 package org.apache.cassandra.repair.scheduler.dao.cass;
 
-import com.datastax.driver.core.Statement;
-import com.datastax.driver.core.querybuilder.QueryBuilder;
-import org.apache.cassandra.repair.scheduler.dao.model.IRepairSequenceDao;
-import org.apache.cassandra.repair.scheduler.dao.model.IRepairStatusDao;
-import org.apache.cassandra.repair.scheduler.entity.ClusterRepairStatus;
-import org.apache.cassandra.repair.scheduler.entity.RepairMetadata;
-import org.apache.cassandra.repair.scheduler.entity.RepairOptions;
-import org.apache.cassandra.repair.scheduler.entity.RepairStatus;
-import org.apache.cassandra.repair.scheduler.entity.TableRepairConfig;
+import java.util.List;
 
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.List;
+import com.datastax.driver.core.Statement;
+import com.datastax.driver.core.querybuilder.QueryBuilder;
+import org.apache.cassandra.repair.scheduler.RepairDaoManager;
+import org.apache.cassandra.repair.scheduler.dao.model.IRepairSequenceDao;
+import org.apache.cassandra.repair.scheduler.dao.model.IRepairStatusDao;
+import org.apache.cassandra.repair.scheduler.entity.RepairMetadata;
+import org.apache.cassandra.repair.scheduler.entity.RepairStatus;
 
 public class RepairStatusDaoImplTest extends BaseDaoUnitTest
 {
     private IRepairStatusDao repairStatusDao;
-    private IRepairSequenceDao repairSequenceDao;
-    private CassDaoUtil cassDaoUtil;
     private String hostId;
 
     @Before
@@ -47,19 +43,14 @@ public class RepairStatusDaoImplTest extends BaseDaoUnitTest
     {
         context = getContext();
         repairStatusDao = new RepairStatusDaoImpl(context, getCassDaoUtil());
-        repairSequenceDao = new RepairSequenceDaoImpl(context, getCassDaoUtil());
+        IRepairSequenceDao repairSequenceDao = new RepairSequenceDaoImpl(context, getCassDaoUtil());
         hostId = context.getCassInteraction().getLocalHostId();
     }
 
     @After
     public void cleanupMethod()
     {
-        ClusterRepairStatus status = repairSequenceDao.getLatestRepairId();
-
-        if (status.getRepairId() > 0)
-        {
-            deleteRepairStatus(status.getRepairId());
-        }
+        context.localSession().execute("TRUNCATE TABLE "+context.getConfig().repair_status_tablename+";");
     }
 
     @Before
@@ -76,7 +67,6 @@ public class RepairStatusDaoImplTest extends BaseDaoUnitTest
         List<RepairMetadata> result = repairStatusDao.getRepairHistory(repairMetadata.getRepairId());
         Assert.assertEquals(1, result.size());
         Assert.assertEquals(RepairStatus.STARTED, result.get(0).getStatus());
-
     }
 
     @Test
@@ -119,7 +109,6 @@ public class RepairStatusDaoImplTest extends BaseDaoUnitTest
         repairStatusDao.markRepairCancelled(repairMetadata.getRepairId(), hostId);
         List<RepairMetadata> result = repairStatusDao.getRepairHistory(repairMetadata.getRepairId());
         Assert.assertEquals(0, result.size());
-
     }
 
     @Test
@@ -137,7 +126,6 @@ public class RepairStatusDaoImplTest extends BaseDaoUnitTest
         result = repairStatusDao.getRepairHistory(repairMetadata.getRepairId());
         Assert.assertEquals(1, result.size());
         Assert.assertEquals(RepairStatus.CANCELLED, result.get(0).getStatus());
-
     }
 
     @Test
@@ -152,7 +140,6 @@ public class RepairStatusDaoImplTest extends BaseDaoUnitTest
             repairStatusDao.markRepairStatusChange(repairMetadata);
         }
 
-
         List<RepairMetadata> result = repairStatusDao.getRepairHistory(repairMetadata.getRepairId());
         Assert.assertEquals(5, result.size());
         Assert.assertEquals(RepairStatus.STARTED, result.get(0).getStatus());
@@ -161,16 +148,5 @@ public class RepairStatusDaoImplTest extends BaseDaoUnitTest
         result = repairStatusDao.getRepairHistory(repairMetadata.getRepairId());
         Assert.assertEquals(5, result.size());
         Assert.assertEquals(RepairStatus.CANCELLED, result.get(3).getStatus());
-
     }
-
-    private void deleteRepairStatus(int repairId)
-    {
-        Statement deleteStatement = QueryBuilder.delete().from(context.getConfig().getRepairKeyspace(), context.getConfig().getRepairStatusTableName())
-
-                .where(QueryBuilder.eq("cluster_name", context.getCassInteraction().getClusterName())).and(QueryBuilder.eq("repair_id", repairId));
-
-        cassDaoUtil.execUpsertStmtRepairDb(deleteStatement);
-    }
-
 }

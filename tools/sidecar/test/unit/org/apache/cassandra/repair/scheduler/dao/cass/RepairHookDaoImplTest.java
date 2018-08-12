@@ -30,7 +30,6 @@ import java.util.List;
 
 public class RepairHookDaoImplTest extends BaseDaoUnitTest
 {
-
     private IRepairHookDao repairHookDao;
     private String hostId;
 

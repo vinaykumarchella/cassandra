@@ -120,9 +120,7 @@ public class RepairHookDaoImpl implements IRepairHookDao
                                                 .where(QueryBuilder.eq("cluster_name", this.cassInteraction.getClusterName()))
                                                 .and(QueryBuilder.eq("repair_id", repairId));
 
-
             ResultSet results = daoUtil.execSelectStmtRepairDb(selectQuery);
-
 
             for (Row r : results.all())
             {
@@ -173,24 +171,5 @@ public class RepairHookDaoImpl implements IRepairHookDao
             logger.error("Exception in getting repair status from repair_hook_status table", e);
         }
         return repairMetadata;
-    }
-
-    public boolean deleteClusterRepairHookStatus(int repairId)
-    {
-        logger.info("Deleting Cluster Repair Hook status for repair Id: {} ", repairId);
-
-        try
-        {
-            Statement deleteQuery = QueryBuilder.delete().from(config.getRepairKeyspace(), config.getRepairHookStatusTableName()).where(QueryBuilder.eq("cluster_name", this.cassInteraction.getClusterName())).and(QueryBuilder.eq("repair_id", repairId));
-
-
-            ResultSet results = daoUtil.execUpsertStmtRepairDb(deleteQuery);
-        }
-        catch (Exception e)
-        {
-            logger.error("Exception in deleting cluster repair hook status", e);
-            return false;
-        }
-        return true;
     }
 }

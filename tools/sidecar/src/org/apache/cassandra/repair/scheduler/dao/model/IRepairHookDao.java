@@ -24,13 +24,39 @@ import java.util.Map;
 import org.apache.cassandra.repair.scheduler.entity.RepairMetadata;
 import org.apache.cassandra.repair.scheduler.entity.RepairStatus;
 
+/**
+ * Interface to manage repair hook metadata status (started, finished etc.,)
+ */
 public interface IRepairHookDao
 {
+    /**
+     * Gets local cluster's repair hook statuses across all nodes for a give repair id
+     * @param repairId Repair Id to query the repair hook status for
+     * @return List of {@link RepairMetadata} with repair hook status
+     */
     List<RepairMetadata> getLocalRepairHookStatus(int repairId);
 
+    /**
+     * Gets local cluster's repair hook status for a give repair id and node id
+     * @param repairId Repair Id to query the repair hook status for
+     * @param nodeId Nodes Id to query the repair hook status for
+     * @return {@link RepairMetadata} object with repair hook status
+     */
     RepairMetadata getLocalRepairHookStatus(int repairId, String nodeId);
 
+    /**
+     * Marks the post repair hook started for local node with a given repair id
+     * @param repairId Repair Id to mark the repair hook status
+     * @return boolean indicating the result of operation
+     */
     boolean markLocalPostRepairHookStarted(int repairId);
 
+    /**
+     * Marks the post repair hook ended for local node with a given repair id and hook(s) status
+     * @param repairId Repair Id to mark the repair hook status
+     * @param status Repair hook status
+     * @param hookSuccess Hook(s) status
+     * @return boolean indicating the result of operation
+     */
     boolean markLocalPostRepairHookEnd(int repairId, RepairStatus status, Map<String, Boolean> hookSuccess);
 }

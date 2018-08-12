@@ -18,14 +18,18 @@
 
 package org.apache.cassandra.repair.scheduler.dao.cass;
 
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Test;
+
 import org.apache.cassandra.repair.scheduler.dao.model.IRepairProcessDao;
 import org.apache.cassandra.repair.scheduler.entity.RepairStatus;
-import org.junit.*;
 
 public class RepairProcessDaoImplTest extends BaseDaoUnitTest
 {
-    public IRepairProcessDao repairProcessDao;
-    private CassDaoUtil cassDaoUtil;
+    private IRepairProcessDao repairProcessDao;
 
     @Before
     public void beforeMethod()
@@ -42,7 +46,7 @@ public class RepairProcessDaoImplTest extends BaseDaoUnitTest
     }
 
     @Test
-    public void getClusterRepairStatus() throws Exception
+    public void getClusterRepairStatus()
     {
         Assert.assertFalse(repairProcessDao.getClusterRepairStatus().isPresent());
         Assert.assertTrue(repairProcessDao.acquireRepairInitLock(repairId));
@@ -53,7 +57,7 @@ public class RepairProcessDaoImplTest extends BaseDaoUnitTest
     }
 
     @Test
-    public void acquireRepairInitLock() throws Exception
+    public void acquireRepairInitLock()
     {
         Assert.assertTrue(repairProcessDao.acquireRepairInitLock(repairId));
         Assert.assertEquals(RepairStatus.STARTED, repairProcessDao.getClusterRepairStatus().get().getRepairStatus());
@@ -61,24 +65,11 @@ public class RepairProcessDaoImplTest extends BaseDaoUnitTest
 
     @Test
     @Ignore("Flakes when run as suite, succeeds locally")
-    public void markClusterRepairCompleted() throws Exception
+    public void markClusterRepairCompleted()
     {
         Assert.assertTrue(repairProcessDao.acquireRepairInitLock(repairId));
         Assert.assertEquals(repairProcessDao.getClusterRepairStatus().get().getRepairStatus(), RepairStatus.STARTED);
         Assert.assertTrue(repairProcessDao.markClusterRepairFinished(repairId));
         Assert.assertEquals(repairProcessDao.getClusterRepairStatus().get().getRepairStatus(), RepairStatus.FINISHED);
     }
-
-    @Test
-    public void deleteClusterRepairStatus() throws Exception
-    {
-
-    }
-
-    @Test
-    public void updateClusterRepairStatus() throws Exception
-    {
-
-    }
-
 }

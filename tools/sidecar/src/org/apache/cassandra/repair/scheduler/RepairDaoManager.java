@@ -25,13 +25,11 @@ import org.slf4j.LoggerFactory;
 import com.datastax.driver.core.Session;
 import org.apache.cassandra.repair.scheduler.config.RepairSchedulerContext;
 import org.apache.cassandra.repair.scheduler.dao.cass.CassDaoUtil;
-import org.apache.cassandra.repair.scheduler.dao.cass.LocalCassDaoImpl;
 import org.apache.cassandra.repair.scheduler.dao.cass.RepairConfigDaoImpl;
 import org.apache.cassandra.repair.scheduler.dao.cass.RepairHookDaoImpl;
 import org.apache.cassandra.repair.scheduler.dao.cass.RepairProcessDaoImpl;
 import org.apache.cassandra.repair.scheduler.dao.cass.RepairSequenceDaoImpl;
 import org.apache.cassandra.repair.scheduler.dao.cass.RepairStatusDaoImpl;
-import org.apache.cassandra.repair.scheduler.dao.model.ILocalCassDao;
 import org.apache.cassandra.repair.scheduler.dao.model.IRepairConfigDao;
 import org.apache.cassandra.repair.scheduler.dao.model.IRepairHookDao;
 import org.apache.cassandra.repair.scheduler.dao.model.IRepairProcessDao;
@@ -55,7 +53,6 @@ public class RepairDaoManager
     private final IRepairSequenceDao repairSequenceDao;
     private final IRepairHookDao repairHookDao;
     private final IRepairConfigDao repairConfigDao;
-    private final ILocalCassDao localCassDao;
     /**
      * Using repair session supplier, so that repair scheduler does not try to initiate session with
      * repair metadata persistent store on startup, rather it tries to establish the connection on first use
@@ -78,7 +75,6 @@ public class RepairDaoManager
         this.repairSequenceDao = new RepairSequenceDaoImpl(context, daoUtil);
         this.repairHookDao = new RepairHookDaoImpl(context, daoUtil);
         this.repairConfigDao = new RepairConfigDaoImpl(context, daoUtil);
-        this.localCassDao = new LocalCassDaoImpl(context, daoUtil);
     }
 
     IRepairProcessDao getRepairProcessDao()
@@ -104,11 +100,6 @@ public class RepairDaoManager
     public IRepairConfigDao getRepairConfigDao()
     {
         return repairConfigDao;
-    }
-
-    ILocalCassDao getLocalCassDao()
-    {
-        return localCassDao;
     }
 
     /**

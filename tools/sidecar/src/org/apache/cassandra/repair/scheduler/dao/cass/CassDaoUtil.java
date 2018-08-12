@@ -51,7 +51,7 @@ public class CassDaoUtil
                                               .setConsistencyLevel(config.getWriteCl()));
     }
 
-    ResultSet execUpsertStmtRepairDb(Statement statement, ConsistencyLevel cl)
+    ResultSet execSerialUpsertStmtRepairDb(Statement statement)
     {
         return repairSession.get()
                             .execute(statement.setIdempotent(true)

@@ -22,6 +22,9 @@ import java.util.Optional;
 
 import org.apache.cassandra.repair.scheduler.entity.ClusterRepairStatus;
 
+/**
+ * Interface to manage repair_process table (Cluster level repair metadata table)
+ */
 public interface IRepairProcessDao
 {
     /**
@@ -32,13 +35,44 @@ public interface IRepairProcessDao
      */
     Optional<ClusterRepairStatus> getClusterRepairStatus();
 
+    /**
+     * Get the cluster repair status for a given repair id
+     *
+     * @param repairId Repair Id to query repair_process table for
+     * @return Cluster repair status information from repair_process table, this does contain node level repair status
+     */
     Optional<ClusterRepairStatus> getClusterRepairStatus(int repairId);
 
+    /**
+     * This is the only coordination place in the repair scheduler, Tries to insert a record with local cluster name
+     * and repair id into repair_process table with IF NOT EXISTS (LWT) with a SERIAL consistency.
+     *
+     * @param repairId Repair Id to insert
+     *                 boolean indicating the result of LWT operation
+     */
     boolean acquireRepairInitLock(int repairId);
 
+    /**
+     * Marking Cluster repair status completed on a repair Id in repair_process table
+     *
+     * @param repairId Repair Id to mark it as completed
+     * @return boolean indicating the result of operation
+     */
     boolean markClusterRepairFinished(int repairId);
 
+    /**
+     * Deletes Cluster repair status for a repair Id from repair_process table
+     *
+     * @param repairId Repair Id to delete the status for
+     * @return boolean indicating the result of operation
+     */
     boolean deleteClusterRepairStatus(int repairId);
 
+    /**
+     * Updates Cluster repair status for a repair Id in repair_process table
+     *
+     * @param clusterRepairStatus repair_process table entry/ row
+     * @return boolean indicating the result of operation
+     */
     boolean updateClusterRepairStatus(ClusterRepairStatus clusterRepairStatus);
 }

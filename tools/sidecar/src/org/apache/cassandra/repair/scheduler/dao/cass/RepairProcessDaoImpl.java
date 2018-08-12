@@ -23,7 +23,6 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Statement;
@@ -122,7 +121,7 @@ public class RepairProcessDaoImpl implements IRepairProcessDao
                                             .value("created_node_id", cassInteraction.getLocalHostId())
                                             .ifNotExists();
 
-        ResultSet results = daoUtil.execUpsertStmtRepairDb(insertQuery);
+        ResultSet results = daoUtil.execSerialUpsertStmtRepairDb(insertQuery);
         return results.wasApplied();
     }
 
