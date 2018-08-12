@@ -108,7 +108,7 @@ public class CompactSTCSRepairHookTest extends EmbeddedUnitTestBase
 
         repairHook.run(this.interactionSpy, tableRepairConfig);
 
-        verify(this.interactionSpy, times(1)).triggerCompaction(REPAIR_SCHEDULER_KS_NAME, "repair_config");
+        verify(this.interactionSpy, times(0)).triggerCompaction(REPAIR_SCHEDULER_KS_NAME, "repair_config");
 
     }
 }

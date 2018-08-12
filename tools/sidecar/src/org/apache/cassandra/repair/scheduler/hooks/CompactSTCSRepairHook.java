@@ -42,7 +42,7 @@ public class CompactSTCSRepairHook implements IRepairHook
     {
         if (tableConfig.getTableMetadata().isPresent() && tableConfig.getTableMetadata().get()
                                                                      .getOptions().getCompaction()
-                                                                     .get("class").matches(".*SizeTiered.*"))
+                                                                     .get("class").matches(".*SizeTired.*"))
         {
             interaction.triggerCompaction(tableConfig.getKeyspace(), tableConfig.getName());
         }
