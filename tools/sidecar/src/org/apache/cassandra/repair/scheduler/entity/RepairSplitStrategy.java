@@ -1,6 +1,6 @@
 package org.apache.cassandra.repair.scheduler.entity;
 
-import org.codehaus.jackson.annotate.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 /**
  * How should the repair scheduler split full range repairs up. Split calculation is critical to ensure a good

@@ -27,8 +27,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.datastax.driver.core.TableMetadata;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.cassandra.repair.scheduler.config.RepairSchedulerConfig;
-import org.codehaus.jackson.annotate.JsonIgnore;
 
 public class TableRepairConfig
 {
@@ -41,7 +41,6 @@ public class TableRepairConfig
     private List<String> postRepairHooks;
     private int interRepairDelayMinutes;
 
-    @JsonIgnore
     private TableMetadata tableMetadata;
 
     /**
