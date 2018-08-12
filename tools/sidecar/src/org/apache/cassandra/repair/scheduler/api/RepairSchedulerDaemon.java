@@ -51,8 +51,6 @@ public class RepairSchedulerDaemon
     private static final Logger logger = LoggerFactory.getLogger(RepairSchedulerDaemon.class);
     private static RepairSchedulerDaemon instance;
     private final RepairSchedulerContext context;
-    // DaoManager is needed here since repairController does not expose bare dao methods which are needed for REST API
-    private final RepairDaoManager daoManager;
     private final RepairController repairController;
     private final RepairManager repairManager;
     // Instead of calling C* - JMX clusterName on every call, we could cache it here and reuse and sure enough
@@ -65,7 +63,7 @@ public class RepairSchedulerDaemon
     private RepairSchedulerDaemon()
     {
         this.context = new RepairSchedulerContextImpl();
-        this.daoManager = new RepairDaoManager(context);
+        final RepairDaoManager daoManager = new RepairDaoManager(context);
         this.repairController = new RepairController(context, daoManager);
         this.repairManager = new RepairManager(context);
 
@@ -107,8 +105,8 @@ public class RepairSchedulerDaemon
     {
         Optional<ClusterRepairStatus> crs = repairController.getClusterRepairStatus();
         return crs
-               .map(clusterRepairStatus -> daoManager.getRepairStatusDao()
-                                                     .getRepairHistory(clusterRepairStatus.getRepairId()))
+               .map(clusterRepairStatus -> repairController.getRepairStatusDao()
+                                                           .getRepairHistory(clusterRepairStatus.getRepairId()))
                .orElse(null);
     }
 
@@ -120,7 +118,7 @@ public class RepairSchedulerDaemon
      */
     public List<RepairMetadata> getRepairStatus(int repairId)
     {
-        return daoManager.getRepairStatusDao().getRepairHistory(repairId);
+        return repairController.getRepairStatusDao().getRepairHistory(repairId);
     }
 
     /**
@@ -130,7 +128,7 @@ public class RepairSchedulerDaemon
      */
     public List<RepairMetadata> getRepairHistory()
     {
-        return daoManager.getRepairStatusDao().getRepairHistory();
+        return repairController.getRepairStatusDao().getRepairHistory();
     }
 
     /**
@@ -140,7 +138,7 @@ public class RepairSchedulerDaemon
      */
     public Map<String, List<TableRepairConfig>> getRepairConfig()
     {
-        return daoManager.getRepairConfigDao().getRepairConfigs(getClusterName());
+        return repairController.getRepairConfigDao().getRepairConfigs();
     }
 
     /**
@@ -151,7 +149,7 @@ public class RepairSchedulerDaemon
      */
     public List<TableRepairConfig> getRepairConfig(String schedule)
     {
-        return daoManager.getRepairConfigDao().getRepairConfigs(getClusterName(), schedule);
+        return repairController.getRepairConfigDao().getRepairConfigs(schedule);
     }
 
     /**
@@ -163,10 +161,10 @@ public class RepairSchedulerDaemon
      */
     public boolean updateRepairConfig(String schedule, TableRepairConfig config)
     {
-        Set<String> validSchedules = daoManager.getRepairConfigDao().getRepairSchedules(getClusterName());
+        Set<String> validSchedules = repairController.getRepairConfigDao().getAllRepairSchedules();
         if (validSchedules.contains(schedule))
         {
-            return daoManager.getRepairConfigDao().saveRepairConfig(getClusterName(), schedule, config);
+            return repairController.getRepairConfigDao().saveRepairConfig(schedule, config);
         }
         throw new RuntimeException(
         String.format("Can not save config to unknown schedule[%s]. Available schedules are: [%s]",
