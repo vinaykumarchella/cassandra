@@ -1,14 +1,11 @@
 package org.apache.cassandra.repair.scheduler.conn;
 
-import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.repair.RepairParallelism;
-import org.apache.cassandra.repair.scheduler.PersistentCCMIntegrationBase;
+import org.apache.cassandra.repair.scheduler.EmbeddedUnitTestBase;
 import org.apache.cassandra.repair.scheduler.entity.RepairSplitStrategy;
-import org.apache.cassandra.repair.scheduler.entity.TableRepairConfig;
 import org.apache.cassandra.repair.scheduler.entity.TableRepairRangeContext;
-import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.concurrent.SimpleCondition;
 import org.apache.cassandra.utils.progress.ProgressEventType;
 
@@ -16,12 +13,10 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
-import java.util.stream.Collectors;
 
 import javax.management.Notification;
 import javax.management.NotificationListener;
@@ -31,7 +26,7 @@ import static junit.framework.TestCase.assertFalse;
 import static junit.framework.TestCase.assertNotNull;
 import static junit.framework.TestCase.assertTrue;
 
-public class CassandraInteractionTest extends PersistentCCMIntegrationBase
+public class CassandraInteractionTest extends EmbeddedUnitTestBase
 {
     CassandraInteraction interaction = null;
 
@@ -114,19 +109,19 @@ public class CassandraInteractionTest extends PersistentCCMIntegrationBase
     @Test
     public void testGetEndpointToHostIdMap()
     {
-        assertEquals(interaction.getEndpointToHostIdMap().size(), NUMBER_OF_NODES);
+        assertEquals(interaction.getEndpointToHostIdMap().size(), 1);
     }
 
     @Test
     public void testGetRangeToEndpointMap()
     {
-        assertEquals(interaction.getRangeToEndpointMap("system_distributed").size(), NUMBER_OF_NODES);
+        assertEquals(interaction.getRangeToEndpointMap("system_distributed").size(), 1);
     }
 
     @Test
     public void testGetSimpleStates()
     {
-        assertEquals(interaction.getSimpleStates().size(), NUMBER_OF_NODES);
+        assertEquals(interaction.getSimpleStates().size(), 1);
     }
 
     @Test
