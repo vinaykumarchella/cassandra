@@ -20,54 +20,83 @@ package org.apache.cassandra.repair.scheduler;
 
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
-import java.util.function.Supplier;
+import java.util.stream.IntStream;
 
 import com.google.common.collect.ImmutableSet;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
-import com.datastax.driver.core.Host;
+import com.datastax.driver.core.BoundStatement;
+import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.PreparedStatement;
+import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.Session;
+import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.repair.scheduler.config.RepairSchedulerConfig;
 import org.apache.cassandra.repair.scheduler.config.RepairSchedulerContext;
 import org.apache.cassandra.repair.scheduler.conn.Cass4xInteraction;
 import org.apache.cassandra.repair.scheduler.conn.CassandraInteraction;
 import org.apache.cassandra.repair.scheduler.dao.cass.CassDaoUtil;
-import org.cassandraunit.AbstractCassandraUnit4CQLTestCase;
-import org.cassandraunit.dataset.CQLDataSet;
-import org.cassandraunit.dataset.cql.ClassPathCQLDataSet;
+import org.apache.cassandra.service.EmbeddedCassandraService;
 
 
-public class EmbeddedUnitTestBase extends AbstractCassandraUnit4CQLTestCase
+public class EmbeddedUnitTestBase
 {
-    protected static int jmxPort = 0;
     protected RepairSchedulerContext context = null;
     protected Set<String> sysKs = ImmutableSet.of("system_auth", "system_distributed", "system_schema");
-    protected static final String REPAIR_SCHEDULER_KS_NAME = "system_distributed_test";
+    protected static final String REPAIR_SCHEDULER_KS_NAME = "system_distributed";
+    protected static Session session;
 
+    private static EmbeddedCassandraService cassandra;
+    private static String initialJmxPortValue;
+    private static final int JMX_PORT = 7188;
+    private static final int MASK = (-1) >>> 1; // all ones except the sign bit
 
     @BeforeClass
-    public static void setupJmxPort() throws IOException
+    public static void setup() throws IOException
     {
-        if (jmxPort == 0)
-        {
-            ServerSocket s = new ServerSocket(0);
-            jmxPort = s.getLocalPort();
+        // Set system property to enable JMX port on localhost for embedded server
+        initialJmxPortValue = System.getProperty("cassandra.jmx.local.port");
+        System.setProperty("cassandra.jmx.local.port", String.valueOf(JMX_PORT));
 
-            System.setProperty("cassandra.jmx.local.port", Integer.toString(jmxPort));
+        SchemaLoader.prepareServer();
+        cassandra = new EmbeddedCassandraService();
+        cassandra.start();
+
+        QueryOptions queryOptions = new QueryOptions();
+        queryOptions.setRefreshSchemaIntervalMillis(0);
+        queryOptions.setRefreshNodeIntervalMillis(0);
+        queryOptions.setRefreshNodeListIntervalMillis(0);
+
+        Cluster cluster = com.datastax.driver.core.Cluster.builder()
+                                                          .addContactPoints(DatabaseDescriptor.getRpcAddress().getHostName())
+                                                          .withPort(DatabaseDescriptor.getNativeTransportPort())
+                                                          .withQueryOptions(queryOptions)
+                                                          .build();
+        session = cluster.connect();
+    }
+
+    @AfterClass
+    public static void teardown() throws IOException
+    {
+        cassandra.stop();
+        if (initialJmxPortValue != null)
+        {
+            System.setProperty("cassandra.jmx.local.port", initialJmxPortValue);
         }
     }
 
-    @Override
-    public CQLDataSet getDataSet()
+    protected Session getSession()
     {
-        return new ClassPathCQLDataSet("setupRepairSchedulerTables.cql", true, false, "system_distributed_test");
+        return session;
     }
 
     public CassDaoUtil getCassDaoUtil()
@@ -103,28 +132,27 @@ public class EmbeddedUnitTestBase extends AbstractCassandraUnit4CQLTestCase
     {
         public String getRepairKeyspace()
         {
-            return "system_distributed_test";
+            return "system_distributed";
         }
 
         @Override
         public int getLocalJmxPort()
         {
-            return jmxPort;
+            return JMX_PORT;
         }
 
         @Override
         public String getRepairNativeEndpoint()
         {
-            return "localhost:"+jmxPort;
+            return DatabaseDescriptor.getRpcAddress().getHostName() + ':' +
+                   DatabaseDescriptor.getNativeTransportPort();
         }
 
         @Override
         public List<String> getRepairStatePersistenceEndpoints()
         {
-            InetSocketAddress addr = getSession().getCluster().getMetadata().getAllHosts().stream()
-                                                 .findFirst().get().getSocketAddress();
-
-            return Collections.singletonList(addr.getAddress().toString() + ":" + addr.getPort());
+            return Collections.singletonList(DatabaseDescriptor.getRpcAddress().getHostName() + ':' +
+                                             DatabaseDescriptor.getNativeTransportPort());
         }
     }
 
@@ -154,5 +182,60 @@ public class EmbeddedUnitTestBase extends AbstractCassandraUnit4CQLTestCase
             }
             return this.interaction;
         }
+    }
+
+    protected void loadDataset(int count)
+    {
+        session.execute(
+        "TRUNCATE system_distributed.repair_process;" +
+        "TRUNCATE system_distributed.repair_sequence;" +
+        "TRUNCATE system_distributed.repair_status;" +
+        "TRUNCATE system_distributed.repair_hook_status;"
+        );
+
+        session.execute(
+        "CREATE KEYSPACE IF NOT exists test_repair WITH replication = {'class': 'SimpleStrategy': 1};" +
+        "CREATE TABLE IF NOT exists test_repair.subrange_test (" +
+        "    key text PRIMARY KEY," +
+        "    value text," +
+        ");" +
+        "" +
+        "CREATE TABLE IF NOT exists test_repair.no_repair (" +
+        "    key text PRIMARY KEY," +
+        "    value text," +
+        ");" +
+        "" +
+        "CREATE TABLE IF NOT exists test_repair.incremental_test (" +
+        "    key text PRIMARY KEY," +
+        "    value text," +
+        ");" +
+        "" +
+        "CREATE TABLE IF NOT exists test_repair.default_test (" +
+        "    key text PRIMARY KEY," +
+        "    value text," +
+        ");"
+        );
+
+        PreparedStatement subRangeStatement = session.prepare("INSERT INTO test_repair.subrange_test (key, value) VALUES (?, ?)");
+        PreparedStatement incrementalStatement = session.prepare("INSERT INTO test_repair.incremental_test (key, value) VALUES (?, ?)");
+
+
+        IntStream.rangeClosed(1, count).parallel()
+                 .mapToObj(Integer::toString).forEach(v -> {
+            BoundStatement boundStmt = subRangeStatement.bind(v, v);
+            BoundStatement boundIncStatement = incrementalStatement.bind(v, v);
+            session.execute(boundStmt);
+            session.execute(boundIncStatement);
+        });
+    }
+
+    protected int getRandomRepairId()
+    {
+        return new Random().nextInt() & MASK;
+    }
+
+    protected int nextRandomPositiveInt()
+    {
+        return new Random().nextInt() & MASK;
     }
 }
