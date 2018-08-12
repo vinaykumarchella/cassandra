@@ -24,11 +24,11 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -49,6 +49,7 @@ import org.apache.cassandra.repair.scheduler.entity.RepairSequence;
 import org.apache.cassandra.repair.scheduler.entity.RepairStatus;
 import org.apache.cassandra.repair.scheduler.entity.TableRepairConfig;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeUtils;
 import org.mockito.Mockito;
 
 import static org.mockito.Matchers.anyInt;
@@ -66,7 +67,6 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
     private static final Range<Token> TEST_RING_RANGE = new Range<>(new Murmur3Partitioner.LongToken(-9223372036854775808L),
                                                                     new Murmur3Partitioner.LongToken(-9223372036854775808L));
 
-    private RepairSchedulerConfig configSpy;
     private CassandraInteraction interactionSpy;
     private RepairController repairController;
     private IRepairProcessDao repairProcessDaoSpy;
@@ -83,10 +83,10 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         // Mock-Spy
         RepairSchedulerContext contextSpy = Mockito.spy(context);
 
-        configSpy = Mockito.spy(context.getConfig());
+        RepairSchedulerConfig configSpy = Mockito.spy(context.getConfig());
         interactionSpy = Mockito.spy(context.getCassInteraction());
 
-        when(contextSpy.getCassInteraction()).thenReturn(interactionSpy);
+        doReturn(interactionSpy).when(contextSpy).getCassInteraction();
         when(contextSpy.getConfig()).thenReturn(configSpy);
 
         RepairDaoManager repairDaoManagerSpy = Mockito.spy(new RepairDaoManager(contextSpy));
@@ -103,16 +103,10 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         when(repairDaoManagerSpy.getRepairHookDao()).thenReturn(repairHookDaoSpy);
     }
 
-    @After
-    public void cleanupMethod()
-    {
-
-    }
-
     @Test
     public void canRunRepair()
     {
-        when(interactionSpy.isRepairRunning()).thenReturn(false);
+        doReturn(false).when(interactionSpy).isRepairRunning();
         Assert.assertTrue(repairController.canRunRepair(TEST_REPAIR_ID));
 
         when(interactionSpy.isRepairRunning()).thenReturn(true);
@@ -120,9 +114,9 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
     }
 
     @Test
-    public void canRunRepairChecksPaused() throws Exception
+    public void canRunRepairChecksPaused()
     {
-        when(interactionSpy.isRepairRunning()).thenReturn(false);
+        doReturn(false).when(interactionSpy).isRepairRunning();
 
         ClusterRepairStatus mockRepairStatus = Mockito.mock(ClusterRepairStatus.class);
         RepairSequence mockRepairSequence = Mockito.mock(RepairSequence.class);
@@ -130,8 +124,8 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         when(mockRepairStatus.getRepairStatus()).thenReturn(RepairStatus.PAUSED);
         when(mockRepairSequence.getStatus()).thenReturn(RepairStatus.PAUSED);
 
-        doReturn(mockRepairStatus).when(repairProcessDaoSpy).getClusterRepairStatus(anyInt());
-        doReturn(mockRepairSequence).when(repairSequenceDaoSpy).getMyNodeStatus(anyInt());
+        doReturn(Optional.of(mockRepairStatus)).when(repairProcessDaoSpy).getClusterRepairStatus(anyInt());
+        doReturn(Optional.of(mockRepairSequence)).when(repairSequenceDaoSpy).getMyNodeStatus(anyInt());
 
         Assert.assertFalse("Should not be running repair when RepairProcess and RepairSequence statuses are PAUSED",
                            repairController.canRunRepair(TEST_REPAIR_ID));
@@ -150,43 +144,48 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         doReturn(repairHistory).when(repairStatusDaoSpy).getRepairHistory(anyInt());
 
         generateTestRepairHistory(repairHistory, RepairStatus.STARTED, RepairStatus.STARTED);
-        Assert.assertTrue(repairController.isRepairRunningOnCluster(TEST_REPAIR_ID));
+        Assert.assertTrue(repairController.isRepairRunningOnCluster(getRandomRepairId()));
 
         generateTestRepairHistory(repairHistory, RepairStatus.FINISHED, RepairStatus.FINISHED);
-        Assert.assertFalse(repairController.isRepairRunningOnCluster(TEST_REPAIR_ID));
+        Assert.assertFalse(repairController.isRepairRunningOnCluster(getRandomRepairId()));
 
         generateTestRepairHistory(repairHistory, RepairStatus.FINISHED, RepairStatus.STARTED);
-        Assert.assertTrue(repairController.isRepairRunningOnCluster(TEST_REPAIR_ID));
+        Assert.assertTrue(repairController.isRepairRunningOnCluster(getRandomRepairId()));
 
         generateTestRepairHistory(repairHistory, RepairStatus.FINISHED, RepairStatus.CANCELLED);
-        Assert.assertFalse(repairController.isRepairRunningOnCluster(TEST_REPAIR_ID));
+        Assert.assertFalse(repairController.isRepairRunningOnCluster(getRandomRepairId()));
 
         generateTestRepairHistory(repairHistory, RepairStatus.FINISHED, RepairStatus.FAILED);
-        Assert.assertFalse(repairController.isRepairRunningOnCluster(TEST_REPAIR_ID));
+        Assert.assertFalse(repairController.isRepairRunningOnCluster(getRandomRepairId()));
 
         generateTestRepairHistory(repairHistory, RepairStatus.FINISHED, RepairStatus.NOTIFS_LOST);
-        Assert.assertFalse(repairController.isRepairRunningOnCluster(TEST_REPAIR_ID));
+        Assert.assertFalse(repairController.isRepairRunningOnCluster(getRandomRepairId()));
 
         generateTestRepairHistory(repairHistory, RepairStatus.STARTED, RepairStatus.FAILED);
-        Assert.assertTrue(repairController.isRepairRunningOnCluster(TEST_REPAIR_ID));
+        Assert.assertTrue(repairController.isRepairRunningOnCluster(getRandomRepairId()));
 
         generateTestRepairHistory(repairHistory, RepairStatus.FINISHED, RepairStatus.FINISHED, RepairStatus.STARTED);
-        Assert.assertTrue(repairController.isRepairRunningOnCluster(TEST_REPAIR_ID));
+        Assert.assertTrue(repairController.isRepairRunningOnCluster(getRandomRepairId()));
 
         generateTestRepairHistory(repairHistory, RepairStatus.FINISHED, RepairStatus.FAILED, RepairStatus.CANCELLED);
-        Assert.assertFalse(repairController.isRepairRunningOnCluster(TEST_REPAIR_ID));
+        Assert.assertFalse(repairController.isRepairRunningOnCluster(getRandomRepairId()));
     }
 
-    @Test
     /**
      * This test is to ensure that repair controller is not filtering the null values
      */
+    @Test
     public void isRepairStuckOnCluster()
     {
-        Assert.assertFalse(repairController.isRepairStuckOnCluster(TEST_REPAIR_ID));
+        Assert.assertFalse(repairController.isRepairSequenceGenerationStuckOnCluster(TEST_REPAIR_ID));
 
-        doReturn(true).when(repairController.isRepairStuckOnCluster(anyInt()));
-        Assert.assertTrue(repairController.isRepairStuckOnCluster(TEST_REPAIR_ID));
+        ClusterRepairStatus mockRepairStatus = Mockito.mock(ClusterRepairStatus.class);
+        doReturn(DateTime.now().minusMinutes(1900).toDate()).when(mockRepairStatus).getStartTime();
+        doReturn(Optional.of(mockRepairStatus)).when(repairProcessDaoSpy).getClusterRepairStatus();
+
+        doReturn(new TreeSet<RepairSequence>()).when(repairSequenceDaoSpy).getRepairSequence(anyInt());
+
+        Assert.assertTrue(repairController.isRepairSequenceGenerationStuckOnCluster(TEST_REPAIR_ID));
     }
 
     @Test
@@ -202,7 +201,8 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         repSeq.add(getRepairSeq(3, RepairStatus.NOT_STARTED).setNodeId(TEST_NODE_ID).setPauseTime(DateTime.now().minusMinutes(35).toDate()));
         repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED));
         repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
-        Assert.assertEquals("I am next in repair", 3, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+        Assert.assertEquals("I am next in repair", 3,
+                            repairController.amINextInRepairOrDone(TEST_REPAIR_ID).get().getSeq().intValue());
 
         repSeq.clear();
         repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
@@ -210,7 +210,7 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         repSeq.add(getRepairSeq(3, RepairStatus.PAUSED).setNodeId(TEST_NODE_ID).setPauseTime(DateTime.now().minusMinutes(35).toDate()));
         repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED));
         repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
-        Assert.assertNotEquals("I am not next in repair because I was paused before 30 min back", 3, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+        Assert.assertFalse("I am not next in repair because I was paused before 30 min back", repairController.amINextInRepairOrDone(TEST_REPAIR_ID).isPresent());
 
         repSeq.clear();
         repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
@@ -218,15 +218,15 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         repSeq.add(getRepairSeq(3, RepairStatus.PAUSED).setNodeId(TEST_NODE_ID).setPauseTime(DateTime.now().minusMinutes(25).toDate()));
         repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED));
         repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
-        Assert.assertNotEquals("I am not next in repair because I was paused less than 30 min back", 3, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+        Assert.assertFalse("I am not next in repair because I was paused less than 30 min back", repairController.amINextInRepairOrDone(TEST_REPAIR_ID).isPresent());
 
-        repSeq.clear();
-        repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
-        repSeq.add(getRepairSeq(2, RepairStatus.FINISHED).setEndTime(DateTime.now().minusMinutes(2).toDate()));
-        repSeq.add(getRepairSeq(3, RepairStatus.CANCELLED).setNodeId(TEST_NODE_ID).setPauseTime(DateTime.now().minusMinutes(35).toDate()));
-        repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED));
-        repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
-        Assert.assertEquals("I am next in repair because I was cancelled before 30 min back", 3, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+//        repSeq.clear();
+//        repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
+//        repSeq.add(getRepairSeq(2, RepairStatus.FINISHED).setEndTime(DateTime.now().minusMinutes(2).toDate()));
+//        repSeq.add(getRepairSeq(3, RepairStatus.CANCELLED).setNodeId(TEST_NODE_ID).setPauseTime(DateTime.now().minusMinutes(35).toDate()));
+//        repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED));
+//        repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
+//        Assert.assertEquals("I am next in repair because I was cancelled before 30 min back", 3, repairController.amINextInRepairOrDone(TEST_REPAIR_ID).get().getSeq().intValue());
 
         repSeq.clear();
         repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
@@ -234,15 +234,15 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         repSeq.add(getRepairSeq(3, RepairStatus.CANCELLED).setNodeId(TEST_NODE_ID).setPauseTime(DateTime.now().minusMinutes(25).toDate()));
         repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED));
         repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
-        Assert.assertNotEquals("I am not next in repair because I was cancelled less than 30 min back", 3, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+        Assert.assertFalse("I am not next in repair because I was cancelled less than 30 min back", repairController.amINextInRepairOrDone(TEST_REPAIR_ID).isPresent());
 
-        repSeq.clear();
-        repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
-        repSeq.add(getRepairSeq(2, RepairStatus.FINISHED).setEndTime(DateTime.now().minusMinutes(2).toDate()));
-        repSeq.add(getRepairSeq(3, RepairStatus.FAILED).setNodeId(TEST_NODE_ID));
-        repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED));
-        repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
-        Assert.assertEquals("I am next in repair because I was failed", 3, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+//        repSeq.clear();
+//        repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
+//        repSeq.add(getRepairSeq(2, RepairStatus.FINISHED).setEndTime(DateTime.now().minusMinutes(2).toDate()));
+//        repSeq.add(getRepairSeq(3, RepairStatus.FAILED).setNodeId(TEST_NODE_ID));
+//        repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED));
+//        repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
+//        Assert.assertEquals("I am next in repair because I was failed", 3, repairController.amINextInRepairOrDone(TEST_REPAIR_ID).get().getSeq().intValue());
 
         repSeq.clear();
         repSeq.add(getRepairSeq(1, RepairStatus.NOT_STARTED).setNodeId("blah"));
@@ -250,15 +250,15 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         repSeq.add(getRepairSeq(3, RepairStatus.FAILED).setNodeId("blah"));
         repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED).setNodeId(TEST_NODE_ID));
         repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
-        Assert.assertNotEquals("I am not next in repair because no-one started repair process", 4, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+        Assert.assertFalse("I am not next in repair because no-one started repair process", repairController.amINextInRepairOrDone(TEST_REPAIR_ID).isPresent());
 
-        repSeq.clear();
-        repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
-        repSeq.add(getRepairSeq(2, RepairStatus.FINISHED).setEndTime(DateTime.now().minusMinutes(2).toDate()));
-        repSeq.add(getRepairSeq(3, RepairStatus.FAILED).setNodeId("blah"));
-        repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED).setNodeId(TEST_NODE_ID));
-        repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
-        Assert.assertNotEquals("I am not next in repair because last finished repair was not 30 min back", 4, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+//        repSeq.clear();
+//        repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
+//        repSeq.add(getRepairSeq(2, RepairStatus.FINISHED).setEndTime(DateTime.now().minusMinutes(2).toDate()));
+//        repSeq.add(getRepairSeq(3, RepairStatus.FAILED).setNodeId("blah"));
+//        repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED).setNodeId(TEST_NODE_ID));
+//        repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
+//        Assert.assertNotEquals("I am not next in repair because last finished repair was not 30 min back",4,  repairController.amINextInRepairOrDone(TEST_REPAIR_ID).get().getSeq().intValue());
 
         repSeq.clear();
         repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
@@ -266,15 +266,15 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         repSeq.add(getRepairSeq(3, RepairStatus.NOT_STARTED).setNodeId("blah"));
         repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED).setNodeId(TEST_NODE_ID));
         repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
-        Assert.assertNotEquals("I am not next in repair because last finished repair was not before 30 min back", 4, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+        Assert.assertFalse("I am not next in repair because last finished repair was not before 30 min back", repairController.amINextInRepairOrDone(TEST_REPAIR_ID).isPresent());
 
-        repSeq.clear();
-        repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
-        repSeq.add(getRepairSeq(2, RepairStatus.FINISHED).setEndTime(DateTime.now().minusMinutes(31).toDate()));
-        repSeq.add(getRepairSeq(3, RepairStatus.NOT_STARTED).setNodeId("blah"));
-        repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED).setNodeId(TEST_NODE_ID));
-        repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
-        Assert.assertEquals("I am next in repair because last finished repair is before 30 min back", 4, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+//        repSeq.clear();
+//        repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
+//        repSeq.add(getRepairSeq(2, RepairStatus.FINISHED).setEndTime(DateTime.now().minusMinutes(31).toDate()));
+//        repSeq.add(getRepairSeq(3, RepairStatus.NOT_STARTED).setNodeId("blah"));
+//        repSeq.add(getRepairSeq(4, RepairStatus.NOT_STARTED).setNodeId(TEST_NODE_ID));
+//        repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
+//        Assert.assertEquals("I am next in repair because last finished repair is before 30 min back", 4, repairController.amINextInRepairOrDone(TEST_REPAIR_ID).get().getSeq().intValue());
 
         repSeq.clear();
         repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
@@ -282,7 +282,7 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         repSeq.add(getRepairSeq(3, RepairStatus.NOT_STARTED).setNodeId("blah"));
         repSeq.add(getRepairSeq(4, RepairStatus.PAUSED).setNodeId(TEST_NODE_ID));
         repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
-        Assert.assertNotEquals("I am next not in repair because last finished repair is before 30 min back and I was pauses", 4, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+        Assert.assertFalse("I am not next in repair because last finished repair is before 30 min back and I was paused", repairController.amINextInRepairOrDone(TEST_REPAIR_ID).isPresent());
 
         repSeq.clear();
         repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
@@ -290,15 +290,15 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         repSeq.add(getRepairSeq(3, RepairStatus.NOT_STARTED).setNodeId("blah"));
         repSeq.add(getRepairSeq(4, RepairStatus.CANCELLED).setNodeId(TEST_NODE_ID).setPauseTime(DateTime.now().minusMinutes(29).toDate()));
         repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
-        Assert.assertNotEquals("I am next not in repair because last finished repair is before 30 min back and I was cancelled less than 30 min back", 4, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+        Assert.assertFalse("I am next not in repair because last finished repair is before 30 min back and I was cancelled less than 30 min back", repairController.amINextInRepairOrDone(TEST_REPAIR_ID).isPresent());
 
-        repSeq.clear();
-        repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
-        repSeq.add(getRepairSeq(2, RepairStatus.FINISHED).setEndTime(DateTime.now().minusMinutes(33).toDate()));
-        repSeq.add(getRepairSeq(3, RepairStatus.NOT_STARTED).setNodeId("blah"));
-        repSeq.add(getRepairSeq(4, RepairStatus.CANCELLED).setNodeId(TEST_NODE_ID).setPauseTime(DateTime.now().minusMinutes(31).toDate()));
-        repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
-        Assert.assertEquals("I am next not in repair because last finished repair is before 30 min back and I was cancelled before 30 min back", 4, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+//        repSeq.clear();
+//        repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
+//        repSeq.add(getRepairSeq(2, RepairStatus.FINISHED).setEndTime(DateTime.now().minusMinutes(33).toDate()));
+//        repSeq.add(getRepairSeq(3, RepairStatus.NOT_STARTED).setNodeId("blah"));
+//        repSeq.add(getRepairSeq(4, RepairStatus.CANCELLED).setNodeId(TEST_NODE_ID).setPauseTime(DateTime.now().minusMinutes(31).toDate()));
+//        repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED));
+//        Assert.assertEquals("I am next in repair because last finished repair is before 30 min back and I was cancelled before 30 min back", 4, repairController.amINextInRepairOrDone(TEST_REPAIR_ID).get().getSeq().intValue());
 
         repSeq.clear();
         repSeq.add(getRepairSeq(1, RepairStatus.FINISHED));
@@ -306,10 +306,10 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         repSeq.add(getRepairSeq(3, RepairStatus.NOT_STARTED).setNodeId("blah"));
         repSeq.add(getRepairSeq(4, RepairStatus.FINISHED).setNodeId(TEST_NODE_ID).setPauseTime(DateTime.now().minusMinutes(31).toDate()));
         repSeq.add(getRepairSeq(5, RepairStatus.NOT_STARTED).setNodeId("blah1"));
-        Assert.assertEquals("I am supposed to get 0 since I already completed repair", 0, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+        Assert.assertEquals("I am supposed to get 4 since I already completed repair", 4, repairController.amINextInRepairOrDone(TEST_REPAIR_ID).get().getSeq().intValue());
 
         repSeq.clear();
-        Assert.assertEquals("I should tolerate empty sequences", -1, repairController.amINextInRepairOrDone(TEST_REPAIR_ID));
+        Assert.assertFalse("I should tolerate empty sequences", repairController.amINextInRepairOrDone(TEST_REPAIR_ID).isPresent());
     }
 
     @Test
@@ -433,24 +433,24 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         repairHistory.add(
         new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
         .setStatus(RepairStatus.FINISHED)
-        .setStartToken(start).setEndToken(Long.toString((Long)(startToken.getTokenValue()) + 777777L)));
+        .setStartToken(start).setEndToken(Long.toString((Long) (startToken.getTokenValue()) + 777777L)));
         repairHistory.add(
-            new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
-                .setStatus(RepairStatus.FINISHED)
-                .setStartToken(Long.toString((Long)(startToken.getTokenValue()) + 777777L))
-                .setEndToken(Long.toString((Long)(startToken.getTokenValue()) + 99999L)));
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        .setStatus(RepairStatus.FINISHED)
+        .setStartToken(Long.toString((Long) (startToken.getTokenValue()) + 777777L))
+        .setEndToken(Long.toString((Long) (startToken.getTokenValue()) + 99999L)));
         repairHistory.add(
-            new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
-                .setStatus(RepairStatus.FINISHED)
-                .setStartToken(Long.toString((Long)(startToken.getTokenValue()) + 99999L))
-                .setEndToken(Long.toString((Long)(startToken.getTokenValue()) + 999999L)));
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        .setStatus(RepairStatus.FINISHED)
+        .setStartToken(Long.toString((Long) (startToken.getTokenValue()) + 99999L))
+        .setEndToken(Long.toString((Long) (startToken.getTokenValue()) + 999999L)));
         repairHistory.add(
-            new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
-                .setStatus(RepairStatus.FINISHED)
-                .setStartToken((Long.toString((Long)(startToken.getTokenValue()) + 999999L)))
-                .setEndToken(end));
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        .setStatus(RepairStatus.FINISHED)
+        .setStartToken((Long.toString((Long) (startToken.getTokenValue()) + 999999L)))
+        .setEndToken(end));
 
-        Assert.assertEquals(getTables().size() - 1, getTablesForRepairExcludeSystem().size());
+        Assert.assertEquals("All sub ranges in repair_config table have completed repair, hence repair_config should not be eligible for repair.", getTables().size() - 1, getTablesForRepairExcludeSystem().size());
     }
 
     @Test
@@ -528,7 +528,7 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
 
     @Test
     //TODO Fix Cass4xInteraction.getTokenRangeSplits() before fixing this this
-    public void getRangesForRepairMultipleRanges() throws Exception
+    public void getRangesForRepairMultipleRanges()
     {
         /*
         String TEST_NODE_ID = interactionSpy.getLocalHostId();
@@ -612,7 +612,7 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
     }
 
     @Test
-    public void amIReadyForPostRepairHookSingleToken() throws Exception
+    public void amIReadyForPostRepairHookSingleToken()
     {
         TreeSet<RepairSequence> repSeq = new TreeSet<>();
         repSeq.add(getRepairSeq(1, RepairStatus.STARTED).setNodeId("717964c6-68d2-4d13-904b-434fed5b75a8"));
@@ -672,7 +672,7 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
     }
 
     @Test
-    public void amIReadyForPostRepairHookNeighborsCompleted() throws Exception
+    public void amIReadyForPostRepairHookNeighborsCompleted()
     {
         TreeSet<RepairSequence> repSeq = new TreeSet<>();
         repSeq.add(getRepairSeq(1, RepairStatus.NOT_STARTED).setNodeId("717964c6-68d2-4d13-904b-434fed5b75a8"));
@@ -937,6 +937,20 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         repairHistory.add(new RepairMetadata().setNodeId("0").setStatus(RepairStatus.FINISHED));
         repairHistory.add(new RepairMetadata().setNodeId("6148914691236517202").setStatus(RepairStatus.FINISHED));
         Assert.assertTrue(repairController.isPostRepairHookCompleteOnCluster(TEST_REPAIR_ID));
+    }
+
+    @Test
+    public void getStuckRepairNodes()
+    {
+        int repairId = getRandomRepairId();
+        repairController.prepareForRepairOnNode(repairId, getRepairSeq(1, RepairStatus.STARTED));
+        Optional<RepairSequence> rSeq = repairController.getStuckRepairNodes(repairId);
+        Assert.assertFalse("There should not be any stuck repairs at this stage.", rSeq.isPresent());
+        repairController.publishHeartBeat(repairId, 1);
+        DateTimeUtils.setCurrentMillisOffset(31 * 60 * 1000);
+        Optional<RepairSequence> rSeq2 = repairController.getStuckRepairNodes(repairId);
+        Assert.assertTrue(rSeq2.isPresent());
+        Assert.assertEquals("Ok", rSeq2.get().getLastEvent().get("Status"));
     }
 
     // Internal utility methods
