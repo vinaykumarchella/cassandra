@@ -79,7 +79,7 @@ public class RepairManagerTest extends EmbeddedUnitTestBase
                   .setRepairOptions(options)
                   .setInterRepairDelayMinutes(10);
 
-        daoManager.getRepairConfigDao().saveRepairConfig(getContext().getCassInteraction().getClusterName(), "default", testConfig);
+        daoManager.getRepairConfigDao().saveRepairConfig("default", testConfig);
 
         // Incremental table
         options.setNumWorkers(2)
@@ -92,7 +92,7 @@ public class RepairManagerTest extends EmbeddedUnitTestBase
                   .setRepairOptions(options)
                   .setInterRepairDelayMinutes(10);
 
-        daoManager.getRepairConfigDao().saveRepairConfig(getContext().getCassInteraction().getClusterName(), "default", testConfig);
+        daoManager.getRepairConfigDao().saveRepairConfig("default", testConfig);
 
         // Disabled table is inserted directly into the repair config to simulate someone supplying
         // _just_ the disabled type.

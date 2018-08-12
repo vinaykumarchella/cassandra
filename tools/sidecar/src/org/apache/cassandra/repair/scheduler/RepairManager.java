@@ -29,7 +29,6 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -44,7 +43,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -216,7 +214,7 @@ public class RepairManager
         else if (crs.get().getRepairStatus().isStarted())
         {
             repairId = crs.get().getRepairId();
-            if (repairController.isRepairStuckOnCluster(repairId))
+            if (repairController.isRepairSequenceGenerationStuckOnCluster(repairId))
             {
                 logger.error("Detected that no repair sequence was generated within process_timeout_seconds!");
                 repairController.abortRepairOnCluster(repairId);
