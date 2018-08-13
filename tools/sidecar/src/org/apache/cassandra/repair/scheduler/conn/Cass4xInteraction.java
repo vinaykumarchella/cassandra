@@ -55,15 +55,17 @@ public class Cass4xInteraction extends CassandraInteractionBase
     //==================================================================================================================
     // A quick note on Endpoints.
     // The definition of "Endpoint" has changed in 4.0 to be an address with a port e.g. 127.0.0.1:9042,
-    // prior it was just an address e.g. 127.0.0.1. This means though that all the endpoint methods are
-    // now coupled to the version.
+    // prior it was just an address e.g. 127.0.0.1. This means that all the following endpoint methods are
+    // now coupled to the version. The rest of Repair Scheduler doesn't care though since all interactoin goes
+    // through these methods, Strings are just Strings as far as the rest is concerned. Also we never persist
+    // Endpoints anywhere (node ids are just node ids, not Endpoints).
     //==================================================================================================================
 
     @Override
     public Map<String, String> getEndpointToHostIdMap()
     {
         RepairUtil.checkState(tryGetConnection(), "JMXConnection is broken or not able to connect");
-        return ssProxy.getEndpointToHostId();
+        return ssProxy.getEndpointWithPortToHostId();
     }
 
 
@@ -71,7 +73,7 @@ public class Cass4xInteraction extends CassandraInteractionBase
     public Map<Range<Token>, List<String>> getRangeToEndpointMap(String keyspace)
     {
         RepairUtil.checkState(tryGetConnection(), "JMXConnection is broken or not able to connect");
-        Map<List<String>, List<String>> rangeToEndpointMap = ssProxy.getRangeToEndpointMap(keyspace);
+        Map<List<String>, List<String>> rangeToEndpointMap = ssProxy.getRangeToEndpointWithPortMap(keyspace);
         // Only consider valid ranges, ignoring incorrect datacenter definitions
         // Or zero replication factor keyspaces
         return rangeToEndpointMap.entrySet().stream()
@@ -87,13 +89,13 @@ public class Cass4xInteraction extends CassandraInteractionBase
     public String getLocalEndpoint()
     {
         RepairUtil.checkState(tryGetConnection(), "JMXConnection is broken or not able to connect");
-        return ssProxy.getHostIdToEndpoint().get(ssProxy.getLocalHostId());
+        return ssProxy.getHostIdToEndpointWithPort().get(ssProxy.getLocalHostId());
     }
 
     @Override
     public Map<String, String> getSimpleStates()
     {
-        return fdProxy.getSimpleStates();
+        return fdProxy.getSimpleStatesWithPort();
     }
 
 
