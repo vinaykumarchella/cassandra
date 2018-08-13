@@ -20,7 +20,6 @@ package org.apache.cassandra.repair.scheduler;
 
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -34,6 +33,7 @@ import org.junit.BeforeClass;
 
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.Session;
@@ -48,7 +48,7 @@ import org.apache.cassandra.repair.scheduler.dao.cass.CassDaoUtil;
 import org.apache.cassandra.service.EmbeddedCassandraService;
 
 
-public class EmbeddedUnitTestBase
+public class EmbeddedUnitTestBase extends CQLTester
 {
     protected RepairSchedulerContext context = null;
     protected Set<String> sysKs = ImmutableSet.of("system_auth", "system_distributed", "system_schema");
@@ -153,6 +153,16 @@ public class EmbeddedUnitTestBase
         {
             return Collections.singletonList(DatabaseDescriptor.getRpcAddress().getHostName() + ':' +
                                              DatabaseDescriptor.getNativeTransportPort());
+        }
+        @Override
+        public ConsistencyLevel getReadCl()
+        {
+            return ConsistencyLevel.LOCAL_ONE;
+        }
+        @Override
+        public ConsistencyLevel getWriteCl()
+        {
+            return ConsistencyLevel.LOCAL_ONE;
         }
     }
 
