@@ -213,13 +213,13 @@ class RepairRunner implements Callable<Boolean>, NotificationListener
             int iterations = 0;
             while (true)
             {
-                if (repairController.areNeighborsHealthy(this.keyspace))
+                if (repairController.areNeighborsHealthy(this.keyspace, this.range))
                 {
                     return true;
                 }
                 iterations += 1;
                 if (iterations % 60 == 0)
-                    logger.debug("Slept for 60s waiting for neighbours to become healthy for keyspace: {}", keyspace);
+                    logger.debug("Slept for 60s waiting for neighbors to become healthy for keyspace: {}", keyspace);
                 Thread.sleep(1000);
             }
         });
