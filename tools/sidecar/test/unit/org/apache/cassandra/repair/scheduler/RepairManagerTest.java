@@ -66,7 +66,7 @@ public class RepairManagerTest extends EmbeddedUnitTestBase
         // Disabled table is inserted directly into the repair config to simulate someone supplying
         // _just_ the disabled type.
         getContext().localSession().execute(
-        "INSERT INTO system_distributed_test.repair_config (cluster_name, schedule_name, keyspace_name, table_name, type) " +
+        "INSERT INTO system_distributed.repair_config (cluster_name, schedule_name, keyspace_name, table_name, type) " +
         "VALUES ('" + context.getCassInteraction().getClusterName() + "', 'default', 'test_repair', 'no_repair', 'disabled')");
     }
 
