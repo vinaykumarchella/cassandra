@@ -50,7 +50,7 @@ public class RepairStatusDaoImplTest extends BaseDaoUnitTest
     @After
     public void cleanupMethod()
     {
-        context.localSession().execute("TRUNCATE TABLE "+context.getConfig().repair_status_tablename+";");
+        context.localSession().execute("TRUNCATE TABLE "+context.getConfig().getRepairKeyspace()+"."+context.getConfig().repair_status_tablename+";");
     }
 
     @Before
