@@ -470,12 +470,12 @@ public class RepairController
     }
 
     /**
-     * Gets repair neighboring nodes/ tokens/ instances for a give keyspace. Note that every keyspace might
+     * Gets repair neighboring nodes/ tokens/ instances for a given keyspace. Note that every keyspace might
      * have a different neighbors depending on their token range data.
      * @param keyspace Name of the keyspace
      * @return Neighoring instances
      */
-    private Set<String> getRepairNeighborEndpoints(String keyspace)
+    private Set<String> getPrimaryRepairNeighborEndpoints(String keyspace)
     {
 
         String localEndpoint = cassInteraction.getLocalEndpoint();
@@ -483,8 +483,44 @@ public class RepairController
         Map<Range<Token>, List<String>> tokenRangesToEndpointMap = cassInteraction.getRangeToEndpointMap(keyspace);
 
         return tokenRangesToEndpointMap.entrySet().stream()
-                                       .filter(tokenRangeEndpointEntry -> tokenRangeEndpointEntry.getValue().contains(localEndpoint))
-                                       .map(tokenRangeEndpointEntry -> tokenRangeEndpointEntry.getValue().get(0)).distinct().collect(Collectors.toSet());
+                                       .filter(tr -> tr.getValue().contains(localEndpoint))
+                                       .map(tr -> tr.getValue().get(0))
+                                       .distinct().collect(Collectors.toSet());
+    }
+
+    /**
+     * Gets repair neighboring nodes/ tokens/ instances for a given keyspace and range. With virtual nodes each
+     * range within each keyspace might have different neighbors. Before repairing each range we check health
+     * of that range, which is where this method comes in.
+     *
+     * Note that unlike getPrimaryRepairNeighborEndpoints, this method does not only consider primary replica nodes,
+     * (the ones responsible for repairing that range, it considers all replicas.
+     *
+     * @param keyspace Name of the keyspace
+     * @param range The token range to get neighbors for
+     *
+     * @return Neighoring instances
+     */
+    private Set<String> getRepairNeighborEndpoints(String keyspace, Range<Token> range)
+    {
+
+        String localEndpoint = cassInteraction.getLocalEndpoint();
+
+        Map<Range<Token>, List<String>> tokenRangesToEndpointMap = cassInteraction.getRangeToEndpointMap(keyspace);
+
+        if (tokenRangesToEndpointMap.containsKey(range))
+        {
+            return new HashSet<>(tokenRangesToEndpointMap.get(range));
+        }
+        else
+        {
+            logger.warn("Range {} is not exactly contained in the token map for {}, falling back to whole keyspace",
+                        range, keyspace);
+            return tokenRangesToEndpointMap.entrySet().stream()
+                                           .filter(tr -> tr.getValue().contains(localEndpoint))
+                                           .flatMap(tr -> tr.getValue().stream())
+                                           .distinct().collect(Collectors.toSet());
+        }
     }
 
     /**
@@ -492,16 +528,15 @@ public class RepairController
      * @param keyspace keyspace specific neighbors are different, hence keyspace is needed
      * @return true/ false indicating the health
      */
-    boolean areNeighborsHealthy(String keyspace)
+    boolean areNeighborsHealthy(String keyspace, Range<Token> range)
     {
-
-
         Map<String, String> simpleEndpointStates = RepairUtil.extractIpsMap(cassInteraction.getSimpleStates());
 
-
-        return getRepairNeighborEndpoints(keyspace).stream().allMatch(endpoint -> simpleEndpointStates.getOrDefault(endpoint, "DOWN").equalsIgnoreCase("UP"));
-
-        // TODO (CASS-818 vchella|2017-12-14): Consider other node status other than UP and DOWN for checking health before running repair
+        // TODO (vchella|2017-12-14): Consider other node status other than UP and DOWN for health check
+        return getRepairNeighborEndpoints(keyspace, range)
+               .stream()
+               .allMatch(endpoint -> simpleEndpointStates.getOrDefault(endpoint, "DOWN")
+                                                         .equalsIgnoreCase("UP"));
     }
 
     /**
@@ -516,7 +551,8 @@ public class RepairController
     }
 
     /**
-     * Returns the neighboring nodes for the local nodes.
+     * Returns the neighboring _primary_ replicas of this local node. These are host ids which must successfully
+     * run repair before we can e.g. run post repair hooks (since this local node may receive data from them)
      *
      * @return Set of node ids. NodeId in this context are HOST-IDs
      */
@@ -532,7 +568,7 @@ public class RepairController
         Map<String, String> endpointToHostIdMap = cassInteraction.getEndpointToHostIdMap();
 
         allKeyspaces.forEach(keyspace -> {
-            Set<String> primaryEndpoints = getRepairNeighborEndpoints(keyspace);
+            Set<String> primaryEndpoints = getPrimaryRepairNeighborEndpoints(keyspace);
 
             Set<String> primaryEndpointHostIds = primaryEndpoints.stream()
                                                                  .map(endpointToHostIdMap::get)
