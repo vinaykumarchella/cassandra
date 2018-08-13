@@ -197,30 +197,29 @@ public class EmbeddedUnitTestBase extends CQLTester
     protected void loadDataset(int count)
     {
         session.execute(
-        "TRUNCATE system_distributed.repair_process;" +
-        "TRUNCATE system_distributed.repair_sequence;" +
-        "TRUNCATE system_distributed.repair_status;" +
-        "TRUNCATE system_distributed.repair_hook_status;"
-        );
-
+        "TRUNCATE system_distributed.repair_process;");
         session.execute(
-        "CREATE KEYSPACE IF NOT exists test_repair WITH replication = {'class': 'SimpleStrategy': 1};" +
-        "CREATE TABLE IF NOT exists test_repair.subrange_test (" +
+        "TRUNCATE system_distributed.repair_sequence;");
+        session.execute("TRUNCATE system_distributed.repair_status;");
+        session.execute("TRUNCATE system_distributed.repair_hook_status;");
+
+        session.execute("CREATE KEYSPACE IF NOT exists test_repair WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};");
+        session.execute("CREATE TABLE IF NOT exists test_repair.subrange_test (" +
         "    key text PRIMARY KEY," +
         "    value text," +
         ");" +
-        "" +
-        "CREATE TABLE IF NOT exists test_repair.no_repair (" +
+        "" );
+        session.execute("CREATE TABLE IF NOT exists test_repair.no_repair (" +
         "    key text PRIMARY KEY," +
         "    value text," +
         ");" +
-        "" +
-        "CREATE TABLE IF NOT exists test_repair.incremental_test (" +
+        "" );
+        session.execute("CREATE TABLE IF NOT exists test_repair.incremental_test (" +
         "    key text PRIMARY KEY," +
         "    value text," +
         ");" +
-        "" +
-        "CREATE TABLE IF NOT exists test_repair.default_test (" +
+        "" );
+        session.execute("CREATE TABLE IF NOT exists test_repair.default_test (" +
         "    key text PRIMARY KEY," +
         "    value text," +
         ");"
