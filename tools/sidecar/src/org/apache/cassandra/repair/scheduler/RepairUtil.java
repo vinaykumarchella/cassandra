@@ -92,7 +92,9 @@ public class RepairUtil
     {
         Map<String, String> returnMap = new HashMap<>();
         map.forEach((endpoint, status) -> {
-            List<String> keys = Arrays.stream(endpoint.split("/")).filter(RepairUtil::validateIP).collect(Collectors.toList());
+            List<String> keys = Arrays.stream(endpoint.split("/"))
+                                      .filter(RepairUtil::validateIP)
+                                      .collect(Collectors.toList());
             if (keys.size() > 0)
             {
                 returnMap.put(keys.get(0), status);
