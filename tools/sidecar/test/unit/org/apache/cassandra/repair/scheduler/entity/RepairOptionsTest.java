@@ -18,14 +18,15 @@
 
 package org.apache.cassandra.repair.scheduler.entity;
 
+import org.apache.cassandra.repair.scheduler.EmbeddedUnitTestBase;
 import org.apache.cassandra.repair.scheduler.config.RepairSchedulerConfig;
-import org.apache.cassandra.repair.scheduler.dao.cass.BaseDaoUnitTest;
+
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 
-public class RepairOptionsTest extends BaseDaoUnitTest
+public class RepairOptionsTest extends EmbeddedUnitTestBase
 {
 
     RepairSchedulerConfig config;
@@ -49,13 +50,15 @@ public class RepairOptionsTest extends BaseDaoUnitTest
     @Test
     public void getNumWorkers() throws Exception
     {
-        Assert.assertTrue(options.getNumWorkers() >= 1 && options.getNumWorkers() <= 4);
+        int numProcessors = Runtime.getRuntime().availableProcessors();
+        Assert.assertTrue(options.getNumWorkers()== numProcessors/2);
     }
 
     @Test
     public void getConfiguredNumWorkers() throws Exception
     {
-        Assert.assertEquals(4, options.getNumWorkers());
+        int numProcessors = Runtime.getRuntime().availableProcessors();
+        Assert.assertEquals(numProcessors/2, options.getNumWorkers());
     }
 
     @Test
