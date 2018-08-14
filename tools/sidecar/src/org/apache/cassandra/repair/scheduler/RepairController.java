@@ -530,13 +530,18 @@ public class RepairController
      */
     boolean areNeighborsHealthy(String keyspace, Range<Token> range)
     {
-        Map<String, String> simpleEndpointStates = RepairUtil.extractIpsMap(cassInteraction.getSimpleStates());
+        Map<String, String> simpleEndpointStates = cassInteraction.getSimpleStates();
+
+        Set<String> neighbors = getRepairNeighborEndpoints(keyspace, range);
 
         // TODO (vchella|2017-12-14): Consider other node status other than UP and DOWN for health check
-        return getRepairNeighborEndpoints(keyspace, range)
-               .stream()
-               .allMatch(endpoint -> simpleEndpointStates.getOrDefault(endpoint, "DOWN")
-                                                         .equalsIgnoreCase("UP"));
+        boolean healthy = neighbors.stream()
+                                   .allMatch(endpoint -> simpleEndpointStates.getOrDefault(endpoint, "DOWN")
+                                                                             .equalsIgnoreCase("UP"));
+        if (!healthy)
+            logger.warn("At least one neighbor out of {} is DOWN", neighbors);
+
+        return healthy;
     }
 
     /**
