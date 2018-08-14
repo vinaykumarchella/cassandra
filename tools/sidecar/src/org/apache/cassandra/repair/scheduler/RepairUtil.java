@@ -44,12 +44,6 @@ public class RepairUtil
 {
     static final String DATE_PATTERN = "MM/dd/yyyy HH:mm:ss.SSS";
     private static final Logger logger = LoggerFactory.getLogger(RepairUtil.class);
-    private static final String IPADDRESS_PATTERN =
-    "^([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\." +
-    "([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\." +
-    "([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\." +
-    "([01]?\\d\\d?|2[0-4]\\d|25[0-5])$";
-    private static final Pattern pattern = Pattern.compile(IPADDRESS_PATTERN);
 
     /**
      * Get Keyspace and table name in Keyspace.TableName format
@@ -75,32 +69,6 @@ public class RepairUtil
         {
             throw new IllegalStateException(String.valueOf(errorMessage));
         }
-    }
-
-    /**
-     * Validate ip address with regular expression
-     *
-     * @param ip ip address for validation
-     * @return true valid ip address, false invalid ip address
-     */
-    private static boolean validateIP(final String ip)
-    {
-        return pattern.matcher(ip).matches();
-    }
-
-    static Map<String, String> extractIpsMap(Map<String, String> map)
-    {
-        Map<String, String> returnMap = new HashMap<>();
-        map.forEach((endpoint, status) -> {
-            List<String> keys = Arrays.stream(endpoint.split("/"))
-                                      .filter(RepairUtil::validateIP)
-                                      .collect(Collectors.toList());
-            if (keys.size() > 0)
-            {
-                returnMap.put(keys.get(0), status);
-            }
-        });
-        return returnMap;
     }
 
     /**
