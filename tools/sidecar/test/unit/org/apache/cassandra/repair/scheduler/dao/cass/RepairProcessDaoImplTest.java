@@ -24,18 +24,21 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import org.apache.cassandra.repair.scheduler.EmbeddedUnitTestBase;
 import org.apache.cassandra.repair.scheduler.dao.model.IRepairProcessDao;
 import org.apache.cassandra.repair.scheduler.entity.RepairStatus;
 
-public class RepairProcessDaoImplTest extends BaseDaoUnitTest
+public class RepairProcessDaoImplTest extends EmbeddedUnitTestBase
 {
     private IRepairProcessDao repairProcessDao;
+    private int repairId;
 
     @Before
     public void beforeMethod()
     {
         context = getContext();
         repairProcessDao = new RepairProcessDaoImpl(context, getCassDaoUtil());
+        repairId = getRandomRepairId();
     }
 
     @After
@@ -64,9 +67,9 @@ public class RepairProcessDaoImplTest extends BaseDaoUnitTest
     }
 
     @Test
-    @Ignore("Flakes when run as suite, succeeds locally")
     public void markClusterRepairCompleted()
     {
+        int repairId = getRandomRepairId();
         Assert.assertTrue(repairProcessDao.acquireRepairInitLock(repairId));
         Assert.assertEquals(repairProcessDao.getClusterRepairStatus().get().getRepairStatus(), RepairStatus.STARTED);
         Assert.assertTrue(repairProcessDao.markClusterRepairFinished(repairId));

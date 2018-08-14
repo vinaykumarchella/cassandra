@@ -202,7 +202,10 @@ public class RepairStatusDaoImpl implements IRepairStatusDao
     {
         List<RepairMetadata> res = new LinkedList<>();
 
-        Statement selectQuery = QueryBuilder.select().from(config.getRepairKeyspace(), config.getRepairStatusTableName()).where(QueryBuilder.eq("cluster_name", cassInteraction.getClusterName())).and(QueryBuilder.eq("repair_id", repairId));
+        Statement selectQuery = QueryBuilder.select()
+                                            .from(config.getRepairKeyspace(), config.getRepairStatusTableName())
+                                            .where(QueryBuilder.eq("cluster_name", cassInteraction.getClusterName()))
+                                            .and(QueryBuilder.eq("repair_id", repairId));
 
         ResultSet results = daoUtil.execSelectStmtRepairDb(selectQuery);
         List<Row> allRows = results.all();

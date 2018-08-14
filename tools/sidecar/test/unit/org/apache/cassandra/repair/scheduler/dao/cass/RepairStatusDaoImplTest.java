@@ -19,24 +19,25 @@
 package org.apache.cassandra.repair.scheduler.dao.cass;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.datastax.driver.core.Statement;
-import com.datastax.driver.core.querybuilder.QueryBuilder;
-import org.apache.cassandra.repair.scheduler.RepairDaoManager;
+import org.apache.cassandra.repair.scheduler.EmbeddedUnitTestBase;
 import org.apache.cassandra.repair.scheduler.dao.model.IRepairSequenceDao;
 import org.apache.cassandra.repair.scheduler.dao.model.IRepairStatusDao;
 import org.apache.cassandra.repair.scheduler.entity.RepairMetadata;
 import org.apache.cassandra.repair.scheduler.entity.RepairStatus;
+import org.apache.cassandra.repair.scheduler.entity.TableRepairConfig;
 
-public class RepairStatusDaoImplTest extends BaseDaoUnitTest
+public class RepairStatusDaoImplTest extends EmbeddedUnitTestBase
 {
     private IRepairStatusDao repairStatusDao;
     private String hostId;
+    private int repairId;
 
     @Before
     public void beforeMethod()
@@ -45,18 +46,13 @@ public class RepairStatusDaoImplTest extends BaseDaoUnitTest
         repairStatusDao = new RepairStatusDaoImpl(context, getCassDaoUtil());
         IRepairSequenceDao repairSequenceDao = new RepairSequenceDaoImpl(context, getCassDaoUtil());
         hostId = context.getCassInteraction().getLocalHostId();
+        repairId = getRandomRepairId();
     }
 
     @After
     public void cleanupMethod()
     {
         context.localSession().execute("TRUNCATE TABLE "+context.getConfig().getRepairKeyspace()+"."+context.getConfig().repair_status_tablename+";");
-    }
-
-    @Before
-    public void setUpMethod()
-    {
-        repairId = getRandomRepairId();
     }
 
     @Test
@@ -122,7 +118,7 @@ public class RepairStatusDaoImplTest extends BaseDaoUnitTest
         Assert.assertEquals(RepairStatus.STARTED, result.get(0).getStatus());
         Assert.assertEquals(hostId, result.get(0).getNodeId());
 
-        repairStatusDao.markRepairCancelled(repairMetadata.getRepairId(), hostId);
+        Assert.assertTrue("Failed to change the repair status to CANCELLED", repairStatusDao.markRepairCancelled(repairMetadata.getRepairId(), hostId));
         result = repairStatusDao.getRepairHistory(repairMetadata.getRepairId());
         Assert.assertEquals(1, result.size());
         Assert.assertEquals(RepairStatus.CANCELLED, result.get(0).getStatus());
@@ -131,22 +127,45 @@ public class RepairStatusDaoImplTest extends BaseDaoUnitTest
     @Test
     public void markRepairCancelled_STARTED_Multi()
     {
-        RepairMetadata repairMetadata = generateRepairMetadata(hostId).setStatus("STARTED");
-        repairStatusDao.markRepairStatusChange(repairMetadata);
+        RepairMetadata repairMetadata;
+        List<RepairMetadata> result;
 
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 5; i++)
         {
             repairMetadata = generateRepairMetadata(hostId).setStatus("STARTED");
             repairStatusDao.markRepairStatusChange(repairMetadata);
+
+            result = repairStatusDao.getRepairHistory(repairMetadata.getRepairId());
+            Assert.assertEquals(i+1, result.size());
+            Assert.assertEquals(RepairStatus.STARTED, result.get(i).getStatus());
+            Assert.assertEquals(hostId, result.get(i).getNodeId());
         }
 
-        List<RepairMetadata> result = repairStatusDao.getRepairHistory(repairMetadata.getRepairId());
-        Assert.assertEquals(5, result.size());
-        Assert.assertEquals(RepairStatus.STARTED, result.get(0).getStatus());
-
-        repairStatusDao.markRepairCancelled(repairMetadata.getRepairId(), hostId);
-        result = repairStatusDao.getRepairHistory(repairMetadata.getRepairId());
+        Assert.assertTrue("Failed to change the repair status to CANCELLED", repairStatusDao.markRepairCancelled(repairId, hostId));
+        result = repairStatusDao.getRepairHistory(repairId);
         Assert.assertEquals(5, result.size());
         Assert.assertEquals(RepairStatus.CANCELLED, result.get(3).getStatus());
+    }
+
+    private RepairMetadata generateRepairMetadata(String hostId)
+    {
+        RepairMetadata repairMetadata = new RepairMetadata();
+        String testKS = "TestKS_" + nextRandomPositiveInt();
+        String testTable = "TestTable_" + nextRandomPositiveInt();
+
+        TableRepairConfig repairConfig = new TableRepairConfig(getContext().getConfig(), "default");
+        repairConfig.setKeyspace(testKS).setName(testTable);
+
+        repairMetadata.setClusterName(TEST_CLUSTER_NAME)
+                      .setRepairId(repairId)
+                      .setNodeId(hostId)
+                      .setKeyspaceName(testKS)
+                      .setTableName(testTable)
+                      .setRepairNum(nextRandomPositiveInt())
+                      .setStartToken("STARTToken_" + nextRandomPositiveInt())
+                      .setEndToken("ENDToken_" + nextRandomPositiveInt())
+                      .setRepairConfig(repairConfig);
+
+        return repairMetadata;
     }
 }

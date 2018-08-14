@@ -18,6 +18,7 @@
 
 package org.apache.cassandra.repair.scheduler.dao.cass;
 
+import org.apache.cassandra.repair.scheduler.EmbeddedUnitTestBase;
 import org.apache.cassandra.repair.scheduler.dao.model.IRepairHookDao;
 import org.apache.cassandra.repair.scheduler.entity.RepairMetadata;
 import org.apache.cassandra.repair.scheduler.entity.RepairStatus;
@@ -28,10 +29,11 @@ import org.junit.Test;
 import java.util.Collections;
 import java.util.List;
 
-public class RepairHookDaoImplTest extends BaseDaoUnitTest
+public class RepairHookDaoImplTest extends EmbeddedUnitTestBase
 {
     private IRepairHookDao repairHookDao;
     private String hostId;
+    private int repairId;
 
     @Before
     public void beforeMethod()
@@ -39,6 +41,12 @@ public class RepairHookDaoImplTest extends BaseDaoUnitTest
         context = getContext();
         hostId = context.getCassInteraction().getLocalHostId();
         repairHookDao = new RepairHookDaoImpl(context, getCassDaoUtil());
+    }
+
+    @Before
+    public void setUpMethod()
+    {
+        repairId = getRandomRepairId();
     }
 
     @Test

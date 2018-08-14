@@ -18,7 +18,10 @@
 
 package org.apache.cassandra.repair.scheduler.dao.cass;
 
-import java.util.Map;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Optional;
 import java.util.SortedSet;
 
@@ -26,13 +29,17 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import org.apache.cassandra.repair.scheduler.EmbeddedUnitTestBase;
 import org.apache.cassandra.repair.scheduler.dao.model.IRepairSequenceDao;
+import org.apache.cassandra.repair.scheduler.entity.RepairHost;
 import org.apache.cassandra.repair.scheduler.entity.RepairSequence;
 import org.apache.cassandra.repair.scheduler.entity.RepairStatus;
+import org.apache.cassandra.utils.GuidGenerator;
 
-public class RepairSequenceDaoImplTest extends BaseDaoUnitTest
+public class RepairSequenceDaoImplTest extends EmbeddedUnitTestBase
 {
     private IRepairSequenceDao repairSequenceDao;
+    private int repairId;
 
     @Before
     public void beforeMethod()
@@ -81,5 +88,22 @@ public class RepairSequenceDaoImplTest extends BaseDaoUnitTest
         SortedSet<RepairSequence> r = repairSequenceDao.getRepairSequence(repairId);
         Assert.assertEquals(1, r.size());
         Assert.assertEquals(RepairStatus.CANCELLED, r.first().getStatus());
+    }
+
+    private List<RepairHost> generateHosts(int n)
+    {
+        List<RepairHost> allHosts = new LinkedList<>();
+        for (int i = 0; i < n; i++)
+        {
+            try
+            {
+                RepairHost host = new RepairHost(InetAddress.getByName("127.0.0." + i), "dc1", "rack1", GuidGenerator.guid());
+                allHosts.add(host);
+            }
+            catch (UnknownHostException e)
+            {
+            }
+        }
+        return allHosts;
     }
 }
