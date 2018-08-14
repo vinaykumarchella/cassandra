@@ -39,7 +39,8 @@ fi
 
 "$JAVA" -server -ea -cp "$CLASSPATH" $JVM_OPTS \
         -Dcassandra.storagedir="$cassandra_storagedir" \
-        -Dlogback.configurationFile=logback-tools.xml \
-         org.apache.cassandra.sidecar.Sidecar $@
-
+        -Drepair_scheduler.logdir=$CASSANDRA_HOME/logs \
+        -Dlogback.configurationFile=repair_scheduler_logback.xml \
+         org.apache.cassandra.repair.scheduler.RepairSchedulerApp $@
+         
 # vi:ai sw=4 ts=4 tw=0 et

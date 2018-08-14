@@ -23,8 +23,15 @@ if [ "x$CASSANDRA_CONF" = "x" ]; then
     CASSANDRA_CONF="$CASSANDRA_HOME/conf"
 fi
 
+# The directory where Cassandra Sidecar's configs live (required)
+if [ "x$CASSANDRA_SIDECAR_CONF" = "x" ]; then
+    CASSANDRA_SIDECAR_CONF="$CASSANDRA_HOME/tools/sidecar/conf"
+fi
+
 # The java classpath (required)
 CLASSPATH="$CASSANDRA_CONF"
+# Add Sidecar conf folder to classpath so that repair_scheduler yaml and log settings are picked up
+CLASSPATH="$CLASSPATH:$CASSANDRA_SIDECAR_CONF"
 
 # This can be the path to a jar file, or a directory containing the
 # compiled classes. NOTE: This isn't needed by the startup script,
@@ -34,7 +41,7 @@ if [ -d $CASSANDRA_HOME/build ] ; then
     cassandra_bin=`ls -1 $CASSANDRA_HOME/build/apache-cassandra*.jar`
     cassandra_bin="$cassandra_bin:$CASSANDRA_HOME/build/classes/stress"
     # Set the classpath for sidecar classes
-    cassandra_bin="$CLASSPATH:$CASSANDRA_HOME/build/classes/sidecar"
+    cassandra_bin="$cassandra_bin:$CASSANDRA_HOME/build/classes/sidecar"
     CLASSPATH="$CLASSPATH:$cassandra_bin"
 fi
 
