@@ -437,25 +437,49 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
 
         Assert.assertEquals(repairableTables, getTablesForRepairExcludeSystem().size());
 
+    }
+
+    @Test
+    public void getTablesForRepair_Subrange_Completed()
+    {
+        loadDataset(100);
+        List<Range<Token>> tokenRanges = this.interactionSpy.getTokenRanges(TEST_REPAIR_KS, true);
+        Murmur3Partitioner.LongToken startToken = (Murmur3Partitioner.LongToken) tokenRanges.get(0).left;
+        Murmur3Partitioner.LongToken endToken = (Murmur3Partitioner.LongToken) tokenRanges.get(0).right;
+        Token p1 = startToken.increaseSlightly();
+        Token p2= p1.increaseSlightly().increaseSlightly().increaseSlightly();
+        Token p3= p2.increaseSlightly().increaseSlightly().increaseSlightly();
+        String start = startToken.toString();
+        String end = endToken.toString();
+
+
+        String TEST_NODE_ID = interactionSpy.getLocalHostId();
+        List<RepairMetadata> repairHistory = new LinkedList<>();
+
+        doReturn(repairHistory).when(repairStatusDaoSpy).getRepairHistory(anyInt(), anyString());
+
         repairHistory.clear();
         repairHistory.add(
         new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
-        .setStartToken(start).setEndToken(Long.toString((Long) (startToken.getTokenValue()) + 777777L)));
+        .setStartToken(start).setEndToken(p1.toString()));
+
         repairHistory.add(
         new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
-        .setStartToken(Long.toString((Long) (startToken.getTokenValue()) + 777777L))
-        .setEndToken(Long.toString((Long) (startToken.getTokenValue()) + 99999L)));
+        .setStartToken(p1.toString())
+        .setEndToken(p2.toString()));
+
         repairHistory.add(
         new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
-        .setStartToken(Long.toString((Long) (startToken.getTokenValue()) + 99999L))
-        .setEndToken(Long.toString((Long) (startToken.getTokenValue()) + 999999L)));
+        .setStartToken(p2.toString())
+        .setEndToken(p3.toString()));
+
         repairHistory.add(
         new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
-        .setStartToken((Long.toString((Long) (startToken.getTokenValue()) + 999999L)))
+        .setStartToken(p3.toString())
         .setEndToken(end));
 
         Assert.assertEquals("All sub ranges in "+SUBRANGE_TEST_TBL_NAME+" table have completed repair, hence "+SUBRANGE_TEST_TBL_NAME+" should not be eligible for repair.", repairableTables - 1, getTablesForRepairExcludeSystem().size());
