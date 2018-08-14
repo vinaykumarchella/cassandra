@@ -33,6 +33,7 @@ import java.util.stream.IntStream;
 
 import com.google.common.collect.ImmutableSet;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 
 import com.datastax.driver.core.BoundStatement;
@@ -55,10 +56,11 @@ import org.apache.cassandra.repair.scheduler.entity.RepairMetadata;
 import org.apache.cassandra.repair.scheduler.entity.TableRepairConfig;
 import org.apache.cassandra.service.EmbeddedCassandraService;
 import org.apache.cassandra.service.StorageService;
+import org.apache.cassandra.tools.ToolsTester;
 import org.apache.cassandra.utils.GuidGenerator;
 
 
-public class EmbeddedUnitTestBase extends CQLTester
+public class EmbeddedUnitTestBase
 {
     protected RepairSchedulerContext context = null;
     protected Set<String> sysKs = ImmutableSet.of("system_auth", "system_distributed", "system_schema");
@@ -68,45 +70,47 @@ public class EmbeddedUnitTestBase extends CQLTester
     protected static int repairableTables = 0;
     protected static String TEST_REPAIR_KS = "test_repair", NO_REPAIR_TBL_NAME="no_repair", SUBRANGE_TEST_TBL_NAME = "subrange_test",
     DEFAULT_TEST_TBL_NAME = "default_test", INCREMENTAL_TEST_TBL_NAME = "incremental_test";
-    private static EmbeddedCassandraService cassandra;
+    private static EmbeddedCassandraService cassandra = null;
     private static String initialJmxPortValue;
     private static final int JMX_PORT = 7188;
     private static final int MASK = (-1) >>> 1; // all ones except the sign bit
-    static
-    {
-    }
+
     @BeforeClass
     public static void setup() throws IOException
     {
-        // Set system property to enable JMX port on localhost for embedded server
-        initialJmxPortValue = System.getProperty("cassandra.jmx.local.port");
-        System.setProperty("cassandra.jmx.local.port", String.valueOf(JMX_PORT));
+        if (cassandra == null)
+        {
+            // Set system property to enable JMX port on localhost for embedded server
+            initialJmxPortValue = System.getProperty("cassandra.jmx.local.port");
+            System.setProperty("cassandra.jmx.local.port", String.valueOf(JMX_PORT));
+            System.setProperty("cassandra.partitioner", "org.apache.cassandra.dht.Murmur3Partitioner");
 
-        SchemaLoader.prepareServer();
-        cassandra = new EmbeddedCassandraService();
-        cassandra.start();
+            SchemaLoader.prepareServer();
+            cassandra = new EmbeddedCassandraService();
+            cassandra.start();
 
-        QueryOptions queryOptions = new QueryOptions();
-        queryOptions.setRefreshSchemaIntervalMillis(0);
-        queryOptions.setRefreshNodeIntervalMillis(0);
-        queryOptions.setRefreshNodeListIntervalMillis(0);
+            QueryOptions queryOptions = new QueryOptions();
+            queryOptions.setRefreshSchemaIntervalMillis(0);
+            queryOptions.setRefreshNodeIntervalMillis(0);
+            queryOptions.setRefreshNodeListIntervalMillis(0);
 
-        Cluster cluster = com.datastax.driver.core.Cluster.builder()
-                                                          .addContactPoints(DatabaseDescriptor.getRpcAddress().getHostName())
-                                                          .withPort(DatabaseDescriptor.getNativeTransportPort())
-                                                          .withQueryOptions(queryOptions)
-                                                          .build();
-        session = cluster.connect();
+            Cluster cluster = com.datastax.driver.core.Cluster.builder()
+                                                              .addContactPoints(DatabaseDescriptor.getRpcAddress().getHostName())
+                                                              .withPort(DatabaseDescriptor.getNativeTransportPort())
+                                                              .withQueryOptions(queryOptions)
+                                                              .build();
+            session = cluster.connect();
+        }
     }
 
-    @AfterClass
-    public static void teardown() throws IOException
+    @Before
+    public void setupRepairTables()
     {
-        cassandra.stop();
-        if (initialJmxPortValue != null)
-        {
-            System.setProperty("cassandra.jmx.local.port", initialJmxPortValue);
-        }
+        session.execute("ALTER KEYSPACE " + REPAIR_SCHEDULER_KS_NAME + " WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};");
+        session.execute("TRUNCATE " + REPAIR_SCHEDULER_KS_NAME + ".repair_process;");
+        session.execute("TRUNCATE " + REPAIR_SCHEDULER_KS_NAME + ".repair_sequence;");
+        session.execute("TRUNCATE " + REPAIR_SCHEDULER_KS_NAME + ".repair_status;");
+        session.execute("TRUNCATE " + REPAIR_SCHEDULER_KS_NAME + ".repair_hook_status;");
     }
 
     protected Session getSession()
@@ -201,12 +205,8 @@ public class EmbeddedUnitTestBase extends CQLTester
 
     protected void loadDataset(int count)
     {
-        session.execute("TRUNCATE system_distributed.repair_process;");
-        session.execute("TRUNCATE system_distributed.repair_sequence;");
-        session.execute("TRUNCATE system_distributed.repair_status;");
-        session.execute("TRUNCATE system_distributed.repair_hook_status;");
-
         session.execute("CREATE KEYSPACE IF NOT exists "+TEST_REPAIR_KS+" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};");
+
         session.execute("CREATE TABLE IF NOT exists "+TEST_REPAIR_KS+"."+SUBRANGE_TEST_TBL_NAME+" (" +
                         "    key text PRIMARY KEY," +
                         "    value text," +
