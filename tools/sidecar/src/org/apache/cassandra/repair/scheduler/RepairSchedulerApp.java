@@ -18,10 +18,16 @@
 
 package org.apache.cassandra.repair.scheduler;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.repair.scheduler.entity.TableRepairConfig;
+import org.apache.cassandra.utils.FBUtilities;
 
 import static org.apache.cassandra.repair.scheduler.api.RepairSchedulerApiUtil.addRepairSchedulerHeaders;
 import static org.apache.cassandra.repair.scheduler.api.RepairSchedulerApiUtil.get;
@@ -44,18 +50,19 @@ public class RepairSchedulerApp
     public static void main(String[] args)
     {
 
-
+        logSystemInfo();
         System.out.println(" _____                               _              _____ _     _                     \n" +
-                    "/  __ \\                             | |            /  ___(_)   | |                    \n" +
-                    "| /  \\/ __ _ ___ ___  __ _ _ __   __| |_ __ __ _   \\ `--. _  __| | ___  ___ __ _ _ __ \n" +
-                    "| |    / _` / __/ __|/ _` | '_ \\ / _` | '__/ _` |   `--. \\ |/ _` |/ _ \\/ __/ _` | '__|\n" +
-                    "| \\__/\\ (_| \\__ \\__ \\ (_| | | | | (_| | | | (_| |  /\\__/ / | (_| |  __/ (_| (_| | |   \n" +
-                    " \\____/\\__,_|___/___/\\__,_|_| |_|\\__,_|_|  \\__,_|  \\____/|_|\\__,_|\\___|\\___\\__,_|_|   \n" +
-                    "                                                                                      \n" +
-                    "                                                                                      ");
+                           "/  __ \\                             | |            /  ___(_)   | |                    \n" +
+                           "| /  \\/ __ _ ___ ___  __ _ _ __   __| |_ __ __ _   \\ `--. _  __| | ___  ___ __ _ _ __ \n" +
+                           "| |    / _` / __/ __|/ _` | '_ \\ / _` | '__/ _` |   `--. \\ |/ _` |/ _ \\/ __/ _` | '__|\n" +
+                           "| \\__/\\ (_| \\__ \\__ \\ (_| | | | | (_| | | | (_| |  /\\__/ / | (_| |  __/ (_| (_| | |   \n" +
+                           " \\____/\\__,_|___/___/\\__,_|_| |_|\\__,_|_|  \\__,_|  \\____/|_|\\__,_|\\___|\\___\\__,_|_|   \n" +
+                           "                                                                                      \n" +
+                           "                                                                                      ");
 
         //Setup the RepairAPI port for the spart to start the service on
         port(getInstance().getContext().getConfig().getRepairAPIPort());
+        get(PATH + "/hello", (req, res) -> "Helo, I am from cassandra_trunk sidecar");
 
         post(PATH + "/config/:schedule", (req, res) ->
                                          getInstance().updateRepairConfig(getParamSchedule(req), deserializeJson(TableRepairConfig.class, req.body())));
@@ -75,6 +82,34 @@ public class RepairSchedulerApp
         post(PATH + "/stop", (req, res) -> getInstance().stopRepair());
 
         after("*", addRepairSchedulerHeaders);
+    }
+
+    // Copied from CassandraDaemon
+    private static void logSystemInfo()
+    {
+        if (logger.isInfoEnabled())
+        {
+            try
+            {
+                logger.info("Hostname: {}", InetAddress.getLocalHost().getHostName());
+            }
+            catch (UnknownHostException e1)
+            {
+                logger.info("Could not resolve local host");
+            }
+
+            logger.info("JVM vendor/version: {}/{}", System.getProperty("java.vm.name"), System.getProperty("java.version"));
+            logger.info("Heap size: {}/{}",
+                        FBUtilities.prettyPrintMemory(Runtime.getRuntime().totalMemory()),
+                        FBUtilities.prettyPrintMemory(Runtime.getRuntime().maxMemory()));
+
+            for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans())
+                logger.info("{} {}: {}", pool.getName(), pool.getType(), pool.getPeakUsage());
+
+            logger.info("Classpath: {}", System.getProperty("java.class.path"));
+
+            logger.info("JVM Arguments: {}", ManagementFactory.getRuntimeMXBean().getInputArguments());
+        }
     }
 }
 
