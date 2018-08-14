@@ -48,6 +48,7 @@ import org.apache.cassandra.repair.scheduler.entity.RepairMetadata;
 import org.apache.cassandra.repair.scheduler.entity.RepairSequence;
 import org.apache.cassandra.repair.scheduler.entity.RepairStatus;
 import org.apache.cassandra.repair.scheduler.entity.TableRepairConfig;
+import org.apache.cassandra.utils.FBUtilities;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeUtils;
 import org.mockito.Mockito;
@@ -101,6 +102,9 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         when(repairDaoManagerSpy.getRepairSequenceDao()).thenReturn(repairSequenceDaoSpy);
         when(repairDaoManagerSpy.getRepairStatusDao()).thenReturn(repairStatusDaoSpy);
         when(repairDaoManagerSpy.getRepairHookDao()).thenReturn(repairHookDaoSpy);
+        //Setting Partitioner to one of the supported partitioners since {@link EmbeddedCassandraService} uses ByteOrderedParttioner
+        interactionSpy.setPartitioner(FBUtilities.newPartitioner(Murmur3Partitioner.class.getName()));
+
     }
 
     @Test
@@ -315,6 +319,8 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
     @Test
     public void getTablesForRepairMultipleRanges()
     {
+            loadDataset(100);
+
         String start = TEST_RING_RANGE.left.toString();
         String end = TEST_RING_RANGE.right.toString();
         String TEST_NODE_ID = interactionSpy.getLocalHostId();
@@ -329,32 +335,34 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         doReturn(testRanges).when(interactionSpy).getTokenRanges(anyString(), eq(true));
         doReturn(repairHistory).when(repairStatusDaoSpy).getRepairHistory(anyInt(), anyString());
 
-        Assert.assertEquals("Did not get correct #Tables for Repair", getTables().size(),
+        Assert.assertEquals("Did not get correct #Tables for Repair", repairableTables,
                             getTablesForRepairExcludeSystem().size());
 
         repairHistory.clear();
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, DEFAULT_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
         .setStartToken(one.left.toString()).setEndToken(one.right.toString()));
-        Assert.assertEquals(getTables().size(), getTablesForRepairExcludeSystem().size());
+        Assert.assertEquals(repairableTables, getTablesForRepairExcludeSystem().size());
 
         repairHistory.clear();
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, DEFAULT_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
         .setStartToken(one.left.toString()).setEndToken(one.right.toString()));
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, DEFAULT_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
         .setStartToken(two.left.toString()).setEndToken(two.right.toString()));
-        Assert.assertEquals(getTables().size() - 1, getTablesForRepairExcludeSystem().size());
+        Assert.assertEquals(repairableTables - 1, getTablesForRepairExcludeSystem().size());
     }
 
     @Test
     public void getTablesForRepair()
     {
-        List<Range<Token>> tokenRanges = this.interactionSpy.getTokenRanges(REPAIR_SCHEDULER_KS_NAME, true);
+        loadDataset(100);
+
+        List<Range<Token>> tokenRanges = this.interactionSpy.getTokenRanges(TEST_REPAIR_KS, true);
         Murmur3Partitioner.LongToken startToken = (Murmur3Partitioner.LongToken) tokenRanges.get(0).left;
         Murmur3Partitioner.LongToken endToken = (Murmur3Partitioner.LongToken) tokenRanges.get(0).right;
         String start = startToken.toString();
@@ -366,91 +374,91 @@ public class RepairControllerTest extends EmbeddedUnitTestBase
         doReturn(repairHistory).when(repairStatusDaoSpy).getRepairHistory(anyInt(), anyString());
 
         repairHistory.clear();
-        repairHistory.add(new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config").setStatus(RepairStatus.FINISHED).setStartToken(start).setEndToken(end));
-        Assert.assertEquals(getTables().size() - 1, getTablesForRepairExcludeSystem().size());
+        repairHistory.add(new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME).setStatus(RepairStatus.FINISHED).setStartToken(start).setEndToken(end));
+        Assert.assertEquals(repairableTables - 1, getTablesForRepairExcludeSystem().size());
 
         repairHistory.clear();
-        Assert.assertEquals(getTables().size(), getTablesForRepairExcludeSystem().size());
+        Assert.assertEquals(repairableTables, getTablesForRepairExcludeSystem().size());
 
         repairHistory.clear();
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.STARTED)
         .setStartToken(start).setEndToken(end));
-        Assert.assertEquals(getTables().size(), getTablesForRepairExcludeSystem().size());
+        Assert.assertEquals(repairableTables, getTablesForRepairExcludeSystem().size());
 
         repairHistory.clear();
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.FAILED)
         .setStartToken(start).setEndToken(end));
-        Assert.assertEquals(getTables().size() - 1, getTablesForRepairExcludeSystem().size());
+        Assert.assertEquals(repairableTables - 1, getTablesForRepairExcludeSystem().size());
 
         repairHistory.clear();
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.PAUSED)
         .setStartToken(start).setEndToken(end));
-        Assert.assertEquals(getTables().size(), getTablesForRepairExcludeSystem().size());
+        Assert.assertEquals(repairableTables, getTablesForRepairExcludeSystem().size());
 
         repairHistory.clear();
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
         .setStartToken(start).setEndToken("-4611686018427387904"));
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
         .setStartToken("-4611686018427387904").setEndToken("0"));
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.STARTED)
         .setStartToken("0").setEndToken("4611686018427387904"));
 
-        Assert.assertEquals(getTables().size(), getTablesForRepairExcludeSystem().size());
+        Assert.assertEquals(repairableTables, getTablesForRepairExcludeSystem().size());
 
         repairHistory.clear();
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
         .setStartToken(start).setEndToken("-4611686018427387904"));
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.STARTED)
         .setStartToken("-4611686018427387904").setEndToken("0"));
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.STARTED)
         .setStartToken("0").setEndToken("4611686018427387904"));
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
         .setStartToken("4611686018427387904").setEndToken(end));
 
-        Assert.assertEquals(getTables().size(), getTablesForRepairExcludeSystem().size());
+        Assert.assertEquals(repairableTables, getTablesForRepairExcludeSystem().size());
 
         repairHistory.clear();
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
         .setStartToken(start).setEndToken(Long.toString((Long) (startToken.getTokenValue()) + 777777L)));
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
         .setStartToken(Long.toString((Long) (startToken.getTokenValue()) + 777777L))
         .setEndToken(Long.toString((Long) (startToken.getTokenValue()) + 99999L)));
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
         .setStartToken(Long.toString((Long) (startToken.getTokenValue()) + 99999L))
         .setEndToken(Long.toString((Long) (startToken.getTokenValue()) + 999999L)));
         repairHistory.add(
-        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, REPAIR_SCHEDULER_KS_NAME, "repair_config")
+        new RepairMetadata(TEST_CLUSTER_NAME, TEST_NODE_ID, TEST_REPAIR_KS, SUBRANGE_TEST_TBL_NAME)
         .setStatus(RepairStatus.FINISHED)
         .setStartToken((Long.toString((Long) (startToken.getTokenValue()) + 999999L)))
         .setEndToken(end));
 
-        Assert.assertEquals("All sub ranges in repair_config table have completed repair, hence repair_config should not be eligible for repair.", getTables().size() - 1, getTablesForRepairExcludeSystem().size());
+        Assert.assertEquals("All sub ranges in "+SUBRANGE_TEST_TBL_NAME+" table have completed repair, hence "+SUBRANGE_TEST_TBL_NAME+" should not be eligible for repair.", repairableTables - 1, getTablesForRepairExcludeSystem().size());
     }
 
     @Test
