@@ -387,6 +387,9 @@ public abstract class CassandraInteractionBase implements CassandraInteraction, 
     @VisibleForTesting
     public void setPartitioner(IPartitioner partitioner)
     {
-        this.partitioner = partitioner;
+        if(this.partitioner == null)
+        {
+            this.partitioner = partitioner;
+        }
     }
 }

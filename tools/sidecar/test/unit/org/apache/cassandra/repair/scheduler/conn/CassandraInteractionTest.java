@@ -1,11 +1,13 @@
 package org.apache.cassandra.repair.scheduler.conn;
 
+import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.repair.RepairParallelism;
 import org.apache.cassandra.repair.scheduler.EmbeddedUnitTestBase;
 import org.apache.cassandra.repair.scheduler.entity.RepairSplitStrategy;
 import org.apache.cassandra.repair.scheduler.entity.TableRepairRangeContext;
+import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.concurrent.SimpleCondition;
 import org.apache.cassandra.utils.progress.ProgressEventType;
 
@@ -55,6 +57,8 @@ public class CassandraInteractionTest extends EmbeddedUnitTestBase
             return;
 
         interaction = getContext().getCassInteraction();
+        //Setting Partitioner to one of the supported partitioners since {@link EmbeddedCassandraService} uses ByteOrderedParttioner
+        interaction.setPartitioner(FBUtilities.newPartitioner(Murmur3Partitioner.class.getName()));
         interaction.connectAsync();
         assertTrue(interaction.connectSync());
         assertTrue(interaction.isConnectionAlive(false));
