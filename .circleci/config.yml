@@ -165,9 +165,23 @@ jobs:
             # get all of our unit test filenames
             set -eo pipefail && circleci tests glob "$HOME/cassandra/test/unit/**/*.java" > /tmp/all_java_unit_tests.txt
 
+            # get all of our unit test filenames from burn tests
+            set -eo pipefail && circleci tests glob "$HOME/cassandra/test/burn/**/*.java" >> /tmp/all_java_unit_tests.txt
+
+            # get all of our unit test filenames from long tests
+            set -eo pipefail && circleci tests glob "$HOME/cassandra/test/long/**/*.java" >> /tmp/all_java_unit_tests.txt
+
+            # get all of our unit test filenames from microbench tests
+            set -eo pipefail && circleci tests glob "$HOME/cassandra/test/microbench/**/*.java" >> /tmp/all_java_unit_tests.txt
+
+
+
             # split up the unit tests into groups based on the number of containers we have
             set -eo pipefail && circleci tests split --split-by=timings --timings-type=filename --index=${CIRCLE_NODE_INDEX} --total=${CIRCLE_NODE_TOTAL} /tmp/all_java_unit_tests.txt > /tmp/java_tests_${CIRCLE_NODE_INDEX}.txt
-            set -eo pipefail && cat /tmp/java_tests_${CIRCLE_NODE_INDEX}.txt | cut -c 37-1000000 | grep "Test\.java$" > /tmp/java_tests_${CIRCLE_NODE_INDEX}_final.txt
+            # Sample lines from /tmp/all_java_unit_tests.txt are as below
+            # /home/cassandra/cassandra/test/unit/org/apache/cassandra/cql3/SimpleQueryTest.java
+            # Hence cutting until `/home/cassandra/cassandra/` which is 27 characters
+            set -eo pipefail && cat /tmp/java_tests_${CIRCLE_NODE_INDEX}.txt | cut -c 27-1000000 | grep "Test\.java$" > /tmp/java_tests_${CIRCLE_NODE_INDEX}_final.txt
             echo "** /tmp/java_tests_${CIRCLE_NODE_INDEX}_final.txt"
             cat /tmp/java_tests_${CIRCLE_NODE_INDEX}_final.txt
       - run:

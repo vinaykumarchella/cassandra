@@ -1720,7 +1720,7 @@
             task.setDynamicAttribute( "test.file.list", "" + all[i]);
 
             task.setDynamicAttribute( "testlist.offset", "" + i );
-
+            
             p.addTask(task);
         }
 
@@ -1776,7 +1776,7 @@
   e.g. org/apache/cassandra/hints/HintMessageTest.java -->
   <target name="testclasslist" depends="build-test" description="Parallel-run tests given in file -Dtest.classlistfile (one-class-per-line, e.g. org/apache/cassandra/db/SomeTest.java)">
     <path id="all-test-classes-path">
-      <fileset dir="${test.unit.src}" includesfile="${test.classlistfile}"/>
+      <fileset dir="${basedir}" includesfile="${test.classlistfile}"/>
     </path>
     <property name="all-test-classes" refid="all-test-classes-path"/>
     <testparallel testdelegate="testlist"/>
