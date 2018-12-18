@@ -17,6 +17,8 @@
  */
 package org.apache.cassandra.audit;
 
+import java.net.InetSocketAddress;
+
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -32,6 +34,7 @@ import com.datastax.driver.core.exceptions.SyntaxError;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.service.StorageService;
+import org.apache.cassandra.thrift.ThriftClientState;
 
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.junit.Assert.assertEquals;
@@ -551,6 +554,29 @@ public class AuditLoggerTest extends CQLTesterBeta
         AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
         assertLogEntry(logEntry, cql);
         assertEquals(0, ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.size());
+    }
+    @Test
+    public void testThriftType()
+    {
+        ThriftClientState cState = new ThriftClientState( new InetSocketAddress(78));
+        AuditLogEntry logEntry = AuditLogEntry.getEvent(AuditLogEntryType.GET_SLICE,"test_cf",cState);
+        AuditLogManager.getInstance().log(logEntry);
+        AuditLogEntry logEntryActual = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
+
+        assertEquals(AuditLogEntryType.GET_SLICE,logEntryActual.getType());
+        assertEquals("test_cf",logEntryActual.getScope());
+    }
+             
+    @Test
+    public void testThriftException()
+    {
+        ThriftClientState cState = new ThriftClientState(new InetSocketAddress(78));
+        AuditLogEntry logEntry = AuditLogEntry.getEvent(AuditLogEntryType.GET_SLICE,"test_cf",cState);
+        AuditLogManager.getInstance().log(logEntry, new Exception("Testing exception"));
+        AuditLogEntry logEntryActual = ((InMemoryAuditLogger) AuditLogManager.getInstance().getLogger()).inMemQueue.poll();
+
+        assertEquals(AuditLogEntryType.REQUEST_FAILURE,logEntryActual.getType());
+        assertEquals("test_cf",logEntryActual.getScope());
     }
 
     /**

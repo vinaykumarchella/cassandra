@@ -332,7 +332,8 @@ public class AuditLogEntry
         Builder auditEntry = new Builder(state)
                              .setType(type)
                              .setKeyspace(keyspace)
-                             .setScope(columnFamily);
+                             .setScope(columnFamily)
+                             .setOperation(Builder.DEFAULT_OPERATION);
         return auditEntry;
     }
 }
