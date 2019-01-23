@@ -18,13 +18,14 @@
 
 package org.apache.cassandra.tools;
 
-import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -35,33 +36,24 @@ import net.openhft.chronicle.queue.ChronicleQueueBuilder;
 import net.openhft.chronicle.queue.ExcerptAppender;
 import net.openhft.chronicle.queue.RollCycles;
 import org.apache.cassandra.audit.BinAuditLogger;
-import org.apache.cassandra.io.util.FileUtils;
-
 
 public class AuditLogViewerTest
 {
     private Path path;
 
-    public static Path createTempDir()
-    {
-        File f = FileUtils.createTempFile("foo", "bar");
-        f.delete();
-        f.mkdir();
-        return Paths.get(f.getPath());
-    }
-
     @Before
-    public void setUp()
+    public void setUp() throws IOException
     {
-        path = createTempDir();
+        path = Files.createTempDirectory("foo");
     }
 
     @After
-    public void tearDown()
+    public void tearDown() throws IOException
     {
-        for (File f : path.toFile().listFiles())
+        if (path.toFile().exists() && path.toFile().isDirectory())
         {
-            f.delete();
+            //Deletes directory and all of it's contents
+            FileUtils.deleteDirectory(path.toFile());
         }
     }
 
