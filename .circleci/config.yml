@@ -80,7 +80,7 @@ version: 2
 jobs:
   build:
     <<: *env_settings
-    parallelism: 1 # This job doesn't benefit from parallelism
+    parallelism: 1 # This  job doesn't benefit from parallelism
     working_directory: ~/
     shell: /bin/bash -eo pipefail -l
     docker:
@@ -379,7 +379,7 @@ jobs:
           name: Clone Cassandra dtest Repository (via git)
           command: |
             export LANG=en_US.UTF-8
-            git clone --single-branch --branch master --depth 1 git://github.com/apache/cassandra-dtest.git ~/cassandra-dtest
+            git clone --single-branch --branch CASSANDRA-15016 --depth 1 https://github.com/vinaykumarchella/cassandra-dtest.git ~/cassandra-dtest
       - run:
           name: Configure virtualenv and python Dependencies
           command: |
