@@ -18,17 +18,16 @@
 package org.apache.cassandra.db.rows;
 
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-
-import com.google.common.base.Predicate;
-import com.google.common.hash.Hasher;
 
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.filter.ColumnFilter;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.paxos.Commit;
-import org.apache.cassandra.utils.HashingUtils;
+import org.apache.cassandra.utils.BiLongAccumulator;
+import org.apache.cassandra.utils.LongAccumulator;
 import org.apache.cassandra.utils.MergeIterator;
 import org.apache.cassandra.utils.SearchIterator;
 import org.apache.cassandra.utils.btree.BTree;
@@ -284,12 +283,24 @@ public interface Row extends Unfiltered, Iterable<ColumnData>
     /**
      * Apply a function to every column in a row
      */
-    public void apply(Consumer<ColumnData> function, boolean reverse);
+    public void apply(Consumer<ColumnData> function);
 
     /**
-     * Apply a funtion to every column in a row until a stop condition is reached
+     * Apply a function to every column in a row
      */
-    public void apply(Consumer<ColumnData> function, Predicate<ColumnData> stopCondition, boolean reverse);
+    public <A> void apply(BiConsumer<A, ColumnData> function, A arg);
+
+    /**
+     * Apply an accumulation funtion to every column in a row
+     */
+
+    public long accumulate(LongAccumulator<ColumnData> accumulator, long initialValue);
+
+    public long accumulate(LongAccumulator<ColumnData> accumulator, Comparator<ColumnData> comparator, ColumnData from, long initialValue);
+
+    public <A> long accumulate(BiLongAccumulator<A, ColumnData> accumulator, A arg, long initialValue);
+
+    public <A> long accumulate(BiLongAccumulator<A, ColumnData> accumulator, A arg, Comparator<ColumnData> comparator, ColumnData from, long initialValue);
 
     /**
      * A row deletion/tombstone.
@@ -391,10 +402,10 @@ public interface Row extends Unfiltered, Iterable<ColumnData>
             return time.deletes(cell);
         }
 
-        public void digest(Hasher hasher)
+        public void digest(Digest digest)
         {
-            time.digest(hasher);
-            HashingUtils.updateWithBoolean(hasher, isShadowable);
+            time.digest(digest);
+            digest.updateWithBoolean(isShadowable);
         }
 
         public int dataSize()
@@ -766,7 +777,7 @@ public interface Row extends Unfiltered, Iterable<ColumnData>
                 if (column == null)
                     return true;
 
-                return AbstractTypeVersionComparator.INSTANCE.compare(column.type, dataColumn.type) < 0;
+                return ColumnMetadataVersionComparator.INSTANCE.compare(column, dataColumn) < 0;
             }
 
             @SuppressWarnings("resource")
@@ -775,9 +786,9 @@ public interface Row extends Unfiltered, Iterable<ColumnData>
                 if (column.isSimple())
                 {
                     Cell merged = null;
-                    for (ColumnData data : versions)
+                    for (int i=0, isize=versions.size(); i<isize; i++)
                     {
-                        Cell cell = (Cell)data;
+                        Cell cell = (Cell) versions.get(i);
                         if (!activeDeletion.deletes(cell))
                             merged = merged == null ? cell : Cells.reconcile(merged, cell);
                     }
@@ -788,8 +799,9 @@ public interface Row extends Unfiltered, Iterable<ColumnData>
                     complexBuilder.newColumn(column);
                     complexCells.clear();
                     DeletionTime complexDeletion = DeletionTime.LIVE;
-                    for (ColumnData data : versions)
+                    for (int i=0, isize=versions.size(); i<isize; i++)
                     {
+                        ColumnData data = versions.get(i);
                         ComplexColumnData cd = (ComplexColumnData)data;
                         if (cd.complexDeletion().supersedes(complexDeletion))
                             complexDeletion = cd.complexDeletion();

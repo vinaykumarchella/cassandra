@@ -40,7 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.audit.AuditLogOptions;
-import org.apache.cassandra.audit.FullQueryLoggerOptions;
+import org.apache.cassandra.fql.FullQueryLoggerOptions;
 import org.apache.cassandra.auth.AllowAllInternodeAuthenticator;
 import org.apache.cassandra.auth.AuthConfig;
 import org.apache.cassandra.auth.IAuthenticator;
@@ -51,6 +51,10 @@ import org.apache.cassandra.auth.IRoleManager;
 import org.apache.cassandra.config.Config.CommitLogSync;
 import org.apache.cassandra.config.EncryptionOptions.ServerEncryptionOptions.InternodeEncryption;
 import org.apache.cassandra.db.ConsistencyLevel;
+import org.apache.cassandra.db.commitlog.AbstractCommitLogSegmentManager;
+import org.apache.cassandra.db.commitlog.CommitLog;
+import org.apache.cassandra.db.commitlog.CommitLogSegmentManagerCDC;
+import org.apache.cassandra.db.commitlog.CommitLogSegmentManagerStandard;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.io.FSWriteError;
@@ -75,6 +79,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.apache.cassandra.io.util.FileUtils.ONE_GB;
+import static org.apache.cassandra.io.util.FileUtils.ONE_MB;
 
 public class DatabaseDescriptor
 {
@@ -141,11 +146,15 @@ public class DatabaseDescriptor
 
     private static final int searchConcurrencyFactor = Integer.parseInt(System.getProperty(Config.PROPERTY_PREFIX + "search_concurrency_factor", "1"));
 
-    private static final boolean disableSTCSInL0 = Boolean.getBoolean(Config.PROPERTY_PREFIX + "disable_stcs_in_l0");
+    private static volatile boolean disableSTCSInL0 = Boolean.getBoolean(Config.PROPERTY_PREFIX + "disable_stcs_in_l0");
     private static final boolean unsafeSystem = Boolean.getBoolean(Config.PROPERTY_PREFIX + "unsafesystem");
 
     // turns some warnings into exceptions for testing
     private static final boolean strictRuntimeChecks = Boolean.getBoolean("cassandra.strict.runtime.checks");
+
+    private static Function<CommitLog, AbstractCommitLogSegmentManager> commitLogSegmentMgrProvider = c -> DatabaseDescriptor.isCDCEnabled()
+                                       ? new CommitLogSegmentManagerCDC(c, DatabaseDescriptor.getCommitLogLocation())
+                                       : new CommitLogSegmentManagerStandard(c, DatabaseDescriptor.getCommitLogLocation());
 
     public static void daemonInitialization() throws ConfigurationException
     {
@@ -490,11 +499,20 @@ public class DatabaseDescriptor
 
         checkForLowestAcceptedTimeouts(conf);
 
-        if (conf.native_transport_max_frame_size_in_mb <= 0)
-            throw new ConfigurationException("native_transport_max_frame_size_in_mb must be positive, but was " + conf.native_transport_max_frame_size_in_mb, false);
-        else if (conf.native_transport_max_frame_size_in_mb >= 2048)
-            throw new ConfigurationException("native_transport_max_frame_size_in_mb must be smaller than 2048, but was "
-                    + conf.native_transport_max_frame_size_in_mb, false);
+        checkValidForByteConversion(conf.native_transport_max_frame_size_in_mb,
+                                    "native_transport_max_frame_size_in_mb", ByteUnit.MEBI_BYTES);
+
+        checkValidForByteConversion(conf.column_index_size_in_kb,
+                                    "column_index_size_in_kb", ByteUnit.KIBI_BYTES);
+
+        checkValidForByteConversion(conf.column_index_cache_size_in_kb,
+                                    "column_index_cache_size_in_kb", ByteUnit.KIBI_BYTES);
+
+        checkValidForByteConversion(conf.batch_size_warn_threshold_in_kb,
+                                    "batch_size_warn_threshold_in_kb", ByteUnit.KIBI_BYTES);
+
+        checkValidForByteConversion(conf.native_transport_frame_block_size_in_kb,
+                                    "native_transport_frame_block_size_in_kb", ByteUnit.KIBI_BYTES);
 
         if (conf.native_transport_max_negotiable_protocol_version != null)
             logger.warn("The configuration option native_transport_max_negotiable_protocol_version has been deprecated " +
@@ -522,71 +540,60 @@ public class DatabaseDescriptor
             conf.native_transport_max_concurrent_requests_in_bytes_per_ip = Runtime.getRuntime().maxMemory() / 40;
         }
 
-        if (conf.cdc_raw_directory == null)
-        {
-            conf.cdc_raw_directory = storagedirFor("cdc_raw");
-        }
-
-        // Windows memory-mapped CommitLog files is incompatible with CDC as we hard-link files in cdc_raw. Confirm we don't have both enabled.
-        if (FBUtilities.isWindows && conf.cdc_enabled && conf.commitlog_compression == null)
-            throw new ConfigurationException("Cannot enable cdc on Windows with uncompressed commitlog.");
-
         if (conf.commitlog_total_space_in_mb == null)
         {
-            int preferredSize = 8192;
-            int minSize = 0;
+            final int preferredSizeInMB = 8192;
             try
             {
                 // use 1/4 of available space.  See discussion on #10013 and #10199
-                minSize = Ints.saturatedCast((guessFileStore(conf.commitlog_directory).getTotalSpace() / 1048576) / 4);
-            }
-            catch (IOException e)
-            {
-                logger.debug("Error checking disk space", e);
-                throw new ConfigurationException(String.format("Unable to check disk space available to %s. Perhaps the Cassandra user does not have the necessary permissions",
-                                                               conf.commitlog_directory), e);
-            }
-            if (minSize < preferredSize)
-            {
-                logger.warn("Small commitlog volume detected at {}; setting commitlog_total_space_in_mb to {}.  You can override this in cassandra.yaml",
-                            conf.commitlog_directory, minSize);
-                conf.commitlog_total_space_in_mb = minSize;
-            }
-            else
-            {
-                conf.commitlog_total_space_in_mb = preferredSize;
-            }
-        }
+                final long totalSpaceInBytes = guessFileStore(conf.commitlog_directory).getTotalSpace();
+                conf.commitlog_total_space_in_mb = calculateDefaultSpaceInMB("commitlog",
+                                                                             conf.commitlog_directory,
+                                                                             "commitlog_total_space_in_mb",
+                                                                             preferredSizeInMB,
+                                                                             totalSpaceInBytes, 1, 4);
 
-        if (conf.cdc_total_space_in_mb == 0)
-        {
-            int preferredSize = 4096;
-            int minSize = 0;
-            try
-            {
-                // use 1/8th of available space.  See discussion on #10013 and #10199 on the CL, taking half that for CDC
-                minSize = Ints.saturatedCast((guessFileStore(conf.cdc_raw_directory).getTotalSpace() / 1048576) / 8);
             }
             catch (IOException e)
             {
                 logger.debug("Error checking disk space", e);
-                throw new ConfigurationException(String.format("Unable to check disk space available to %s. Perhaps the Cassandra user does not have the necessary permissions",
-                                                               conf.cdc_raw_directory), e);
-            }
-            if (minSize < preferredSize)
-            {
-                logger.warn("Small cdc volume detected at {}; setting cdc_total_space_in_mb to {}.  You can override this in cassandra.yaml",
-                            conf.cdc_raw_directory, minSize);
-                conf.cdc_total_space_in_mb = minSize;
-            }
-            else
-            {
-                conf.cdc_total_space_in_mb = preferredSize;
+                throw new ConfigurationException(String.format("Unable to check disk space available to '%s'. Perhaps the Cassandra user does not have the necessary permissions",
+                                                               conf.commitlog_directory), e);
             }
         }
 
         if (conf.cdc_enabled)
         {
+            // Windows memory-mapped CommitLog files is incompatible with CDC as we hard-link files in cdc_raw. Confirm we don't have both enabled.
+            if (FBUtilities.isWindows && conf.commitlog_compression == null)
+                throw new ConfigurationException("Cannot enable cdc on Windows with uncompressed commitlog.");
+
+            if (conf.cdc_raw_directory == null)
+            {
+                conf.cdc_raw_directory = storagedirFor("cdc_raw");
+            }
+
+            if (conf.cdc_total_space_in_mb == 0)
+            {
+                final int preferredSizeInMB = 4096;
+                try
+                {
+                    // use 1/8th of available space.  See discussion on #10013 and #10199 on the CL, taking half that for CDC
+                    final long totalSpaceInBytes = guessFileStore(conf.cdc_raw_directory).getTotalSpace();
+                    conf.cdc_total_space_in_mb = calculateDefaultSpaceInMB("cdc",
+                                                                           conf.cdc_raw_directory,
+                                                                           "cdc_total_space_in_mb",
+                                                                           preferredSizeInMB,
+                                                                           totalSpaceInBytes, 1, 8);
+                }
+                catch (IOException e)
+                {
+                    logger.debug("Error checking disk space", e);
+                    throw new ConfigurationException(String.format("Unable to check disk space available to '%s'. Perhaps the Cassandra user does not have the necessary permissions",
+                                                                   conf.cdc_raw_directory), e);
+                }
+            }
+
             logger.info("cdc_enabled is true. Starting casssandra node with Change-Data-Capture enabled.");
         }
 
@@ -766,15 +773,6 @@ public class DatabaseDescriptor
                                             "server_encryption_options.internode_encryption = " + conf.server_encryption_options.internode_encryption, false);
         }
 
-        if (conf.stream_entire_sstables)
-        {
-            if (conf.server_encryption_options.enabled || conf.server_encryption_options.optional)
-            {
-                logger.warn("Internode encryption enabled. Disabling zero copy SSTable transfers for streaming.");
-                conf.stream_entire_sstables = false;
-            }
-        }
-
         if (conf.max_value_size_in_mb <= 0)
             throw new ConfigurationException("max_value_size_in_mb must be positive", false);
         else if (conf.max_value_size_in_mb >= 2048)
@@ -854,6 +852,23 @@ public class DatabaseDescriptor
         if (storagedir == null)
             throw new ConfigurationException(errMsgType + " is missing and -Dcassandra.storagedir is not set", false);
         return storagedir;
+    }
+
+    static int calculateDefaultSpaceInMB(String type, String path, String setting, int preferredSizeInMB, long totalSpaceInBytes, long totalSpaceNumerator, long totalSpaceDenominator)
+    {
+        final long totalSizeInMB = totalSpaceInBytes / ONE_MB;
+        final int minSizeInMB = Ints.saturatedCast(totalSpaceNumerator * totalSizeInMB / totalSpaceDenominator);
+
+        if (minSizeInMB < preferredSizeInMB)
+        {
+            logger.warn("Small {} volume detected at '{}'; setting {} to {}.  You can override this in cassandra.yaml",
+                        type, path, setting, minSizeInMB);
+            return minSizeInMB;
+        }
+        else
+        {
+            return preferredSizeInMB;
+        }
     }
 
     public static void applyAddressConfig() throws ConfigurationException
@@ -1086,18 +1101,25 @@ public class DatabaseDescriptor
     // definitely not safe for tools + clients - implicitly instantiates schema
     public static void applyPartitioner()
     {
+        applyPartitioner(conf);
+    }
+
+    public static void applyPartitioner(Config conf)
+    {
         /* Hashing strategy */
         if (conf.partitioner == null)
         {
             throw new ConfigurationException("Missing directive: partitioner", false);
         }
+        String name = conf.partitioner;
         try
         {
-            partitioner = FBUtilities.newPartitioner(System.getProperty(Config.PROPERTY_PREFIX + "partitioner", conf.partitioner));
+            name = System.getProperty(Config.PROPERTY_PREFIX + "partitioner", conf.partitioner);
+            partitioner = FBUtilities.newPartitioner(name);
         }
         catch (Exception e)
         {
-            throw new ConfigurationException("Invalid partitioner class " + conf.partitioner, false);
+            throw new ConfigurationException("Invalid partitioner class " + name, e);
         }
 
         paritionerName = partitioner.getClass().getCanonicalName();
@@ -1129,9 +1151,17 @@ public class DatabaseDescriptor
             catch (IOException e)
             {
                 if (e instanceof NoSuchFileException)
+                {
                     path = path.getParent();
+                    if (path == null)
+                    {
+                        throw new ConfigurationException("Unable to find filesystem for '" + dir + "'.");
+                    }
+                }
                 else
+                {
                     throw e;
+                }
             }
         }
     }
@@ -1361,29 +1391,40 @@ public class DatabaseDescriptor
 
     public static int getColumnIndexSize()
     {
-        return conf.column_index_size_in_kb * 1024;
+        return (int) ByteUnit.KIBI_BYTES.toBytes(conf.column_index_size_in_kb);
+    }
+
+    public static int getColumnIndexSizeInKB()
+    {
+        return conf.column_index_size_in_kb;
     }
 
     @VisibleForTesting
     public static void setColumnIndexSize(int val)
     {
+        checkValidForByteConversion(val, "column_index_size_in_kb", ByteUnit.KIBI_BYTES);
         conf.column_index_size_in_kb = val;
     }
 
     public static int getColumnIndexCacheSize()
     {
-        return conf.column_index_cache_size_in_kb * 1024;
+        return (int) ByteUnit.KIBI_BYTES.toBytes(conf.column_index_cache_size_in_kb);
     }
 
-    @VisibleForTesting
+    public static int getColumnIndexCacheSizeInKB()
+    {
+        return conf.column_index_cache_size_in_kb;
+    }
+
     public static void setColumnIndexCacheSize(int val)
     {
+        checkValidForByteConversion(val, "column_index_cache_size_in_kb", ByteUnit.KIBI_BYTES);
         conf.column_index_cache_size_in_kb = val;
     }
 
     public static int getBatchSizeWarnThreshold()
     {
-        return conf.batch_size_warn_threshold_in_kb * 1024;
+        return (int) ByteUnit.KIBI_BYTES.toBytes(conf.batch_size_warn_threshold_in_kb);
     }
 
     public static int getBatchSizeWarnThresholdInKB()
@@ -1393,7 +1434,7 @@ public class DatabaseDescriptor
 
     public static long getBatchSizeFailThreshold()
     {
-        return conf.batch_size_fail_threshold_in_kb * 1024L;
+        return ByteUnit.KIBI_BYTES.toBytes(conf.batch_size_fail_threshold_in_kb);
     }
 
     public static int getBatchSizeFailThresholdInKB()
@@ -1408,6 +1449,7 @@ public class DatabaseDescriptor
 
     public static void setBatchSizeWarnThresholdInKB(int threshold)
     {
+        checkValidForByteConversion(threshold, "batch_size_warn_threshold_in_kb", ByteUnit.KIBI_BYTES);
         conf.batch_size_warn_threshold_in_kb = threshold;
     }
 
@@ -1696,7 +1738,7 @@ public class DatabaseDescriptor
         conf.compaction_throughput_mb_per_sec = value;
     }
 
-    public static long getCompactionLargePartitionWarningThreshold() { return conf.compaction_large_partition_warning_threshold_mb * 1024L * 1024L; }
+    public static long getCompactionLargePartitionWarningThreshold() { return ByteUnit.MEBI_BYTES.toBytes(conf.compaction_large_partition_warning_threshold_mb); }
 
     public static int getConcurrentValidations()
     {
@@ -1721,12 +1763,17 @@ public class DatabaseDescriptor
 
     public static long getMinFreeSpacePerDriveInBytes()
     {
-        return conf.min_free_space_per_drive_in_mb * 1024L * 1024L;
+        return ByteUnit.MEBI_BYTES.toBytes(conf.min_free_space_per_drive_in_mb);
     }
 
     public static boolean getDisableSTCSInL0()
     {
         return disableSTCSInL0;
+    }
+
+    public static void setDisableSTCSInL0(boolean disabled)
+    {
+        disableSTCSInL0 = disabled;
     }
 
     public static int getStreamThroughputOutboundMegabitsPerSec()
@@ -1775,6 +1822,16 @@ public class DatabaseDescriptor
         conf.commitlog_compression = compressor;
     }
 
+    public static Config.FlushCompression getFlushCompression()
+    {
+        return conf.flush_compression;
+    }
+
+    public static void setFlushCompression(Config.FlushCompression compression)
+    {
+        conf.flush_compression = compression;
+    }
+
    /**
     * Maximum number of buffers in the compression pool. The default value is 3, it should not be set lower than that
     * (one segment in compression, one written to, one in reserve); delays in compression may cause the log to use
@@ -1792,7 +1849,7 @@ public class DatabaseDescriptor
 
     public static int getMaxMutationSize()
     {
-        return conf.max_mutation_size_in_kb * 1024;
+        return (int) ByteUnit.KIBI_BYTES.toBytes(conf.max_mutation_size_in_kb);
     }
 
     public static int getTombstoneWarnThreshold()
@@ -1820,7 +1877,7 @@ public class DatabaseDescriptor
      */
     public static int getCommitLogSegmentSize()
     {
-        return conf.commitlog_segment_size_in_mb * 1024 * 1024;
+        return (int) ByteUnit.MEBI_BYTES.toBytes(conf.commitlog_segment_size_in_mb);
     }
 
     public static void setCommitLogSegmentSize(int sizeMegabytes)
@@ -2042,7 +2099,7 @@ public class DatabaseDescriptor
 
     public static int getNativeTransportMaxFrameSize()
     {
-        return conf.native_transport_max_frame_size_in_mb * 1024 * 1024;
+        return (int) ByteUnit.MEBI_BYTES.toBytes(conf.native_transport_max_frame_size_in_mb);
     }
 
     public static long getNativeTransportMaxConcurrentConnections()
@@ -2082,7 +2139,7 @@ public class DatabaseDescriptor
 
     public static int getNativeTransportFrameBlockSize()
     {
-        return conf.native_transport_frame_block_size_in_kb * 1024;
+        return (int) ByteUnit.KIBI_BYTES.toBytes(conf.native_transport_frame_block_size_in_kb);
     }
 
     public static double getCommitLogSyncGroupWindow()
@@ -2341,7 +2398,7 @@ public class DatabaseDescriptor
 
     public static long getMaxHintsFileSize()
     {
-        return conf.max_hints_file_size_in_mb * 1024L * 1024L;
+        return  ByteUnit.MEBI_BYTES.toBytes(conf.max_hints_file_size_in_mb);
     }
 
     public static ParameterizedClass getHintsCompression()
@@ -2386,11 +2443,6 @@ public class DatabaseDescriptor
         }
 
         return conf.file_cache_round_up;
-    }
-
-    public static boolean getBufferPoolUseHeapIfExhausted()
-    {
-        return conf.buffer_pool_use_heap_if_exhausted;
     }
 
     public static DiskOptimizationStrategy getDiskOptimizationStrategy()
@@ -2762,6 +2814,7 @@ public class DatabaseDescriptor
         return conf.cdc_enabled;
     }
 
+    @VisibleForTesting
     public static void setCDCEnabled(boolean cdc_enabled)
     {
         conf.cdc_enabled = cdc_enabled;
@@ -2943,6 +2996,16 @@ public class DatabaseDescriptor
         conf.repaired_data_tracking_for_partition_reads_enabled = enabled;
     }
 
+    public static boolean snapshotOnRepairedDataMismatch()
+    {
+        return conf.snapshot_on_repaired_data_mismatch;
+    }
+
+    public static void setSnapshotOnRepairedDataMismatch(boolean enabled)
+    {
+        conf.snapshot_on_repaired_data_mismatch = enabled;
+    }
+
     public static boolean reportUnconfirmedRepairedDataMismatches()
     {
         return conf.report_unconfirmed_repaired_data_mismatches;
@@ -2968,4 +3031,63 @@ public class DatabaseDescriptor
         logger.info("Setting use_offheap_merkle_trees to {}", value);
         conf.use_offheap_merkle_trees = value;
     }
+
+    public static Function<CommitLog, AbstractCommitLogSegmentManager> getCommitLogSegmentMgrProvider()
+    {
+        return commitLogSegmentMgrProvider;
+    }
+
+    public static void setCommitLogSegmentMgrProvider(Function<CommitLog, AbstractCommitLogSegmentManager> provider)
+    {
+        commitLogSegmentMgrProvider = provider;
+    }
+
+    /**
+     * Class that primarily tracks overflow thresholds during conversions
+     */
+    private enum ByteUnit {
+        KIBI_BYTES(2048 * 1024, 1024),
+        MEBI_BYTES(2048, 1024 * 1024);
+
+        private final int overflowThreshold;
+        private final int multiplier;
+
+        ByteUnit(int t, int m)
+        {
+            this.overflowThreshold = t;
+            this.multiplier = m;
+        }
+
+        public int overflowThreshold()
+        {
+            return overflowThreshold;
+        }
+
+        public boolean willOverflowInBytes(int val)
+        {
+            return val >= overflowThreshold;
+        }
+
+        public long toBytes(int val)
+        {
+            return val * multiplier;
+        }
+    }
+
+    /**
+     * Ensures passed in configuration value is positive and will not overflow when converted to Bytes
+     */
+    private static void checkValidForByteConversion(int val, final String name, final ByteUnit unit)
+    {
+        if (val < 0 || unit.willOverflowInBytes(val))
+            throw new ConfigurationException(String.format("%s must be positive value < %d, but was %d",
+                                                           name, unit.overflowThreshold(), val), false);
+    }
+
+    public static int getValidationPreviewPurgeHeadStartInSec()
+    {
+        int seconds = conf.validation_preview_purge_head_start_in_sec;
+        return Math.max(seconds, 0);
+    }
+
 }

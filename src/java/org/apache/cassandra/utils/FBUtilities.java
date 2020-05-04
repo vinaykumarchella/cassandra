@@ -22,6 +22,8 @@ import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.net.*;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.zip.CRC32;
@@ -70,6 +72,11 @@ import org.apache.cassandra.net.AsyncOneResponse;
 
 public class FBUtilities
 {
+    static
+    {
+        preventIllegalAccessWarnings();
+    }
+
     private static final Logger logger = LoggerFactory.getLogger(FBUtilities.class);
 
     private static final ObjectMapper jsonMapper = new ObjectMapper(new JsonFactory());
@@ -90,6 +97,8 @@ public class FBUtilities
     private static volatile InetAddressAndPort broadcastInetAddressAndPort;
     private static volatile InetAddressAndPort localInetAddressAndPort;
 
+    private static volatile String previousReleaseVersionString;
+
     public static int getAvailableProcessors()
     {
         String availableProcessors = System.getProperty("cassandra.available_processors");
@@ -100,6 +109,18 @@ public class FBUtilities
     }
 
     public static final int MAX_UNSIGNED_SHORT = 0xFFFF;
+
+    public static MessageDigest newMessageDigest(String algorithm)
+    {
+        try
+        {
+            return MessageDigest.getInstance(algorithm);
+        }
+        catch (NoSuchAlgorithmException nsae)
+        {
+            throw new RuntimeException("the requested digest algorithm (" + algorithm + ") is not available", nsae);
+        }
+    }
 
     /**
      * Please use getJustBroadcastAddress instead. You need this only when you have to listen/connect. It's also missing
@@ -324,6 +345,16 @@ public class FBUtilities
         return triggerDir;
     }
 
+    public static void setPreviousReleaseVersionString(String previousReleaseVersionString)
+    {
+        FBUtilities.previousReleaseVersionString = previousReleaseVersionString;
+    }
+
+    public static String getPreviousReleaseVersionString()
+    {
+        return previousReleaseVersionString;
+    }
+
     public static String getReleaseVersionString()
     {
         try (InputStream in = FBUtilities.class.getClassLoader().getResourceAsStream("org/apache/cassandra/config/version.properties"))
@@ -460,6 +491,81 @@ public class FBUtilities
             Uninterruptibles.sleepUninterruptibly(delay, TimeUnit.MILLISECONDS);
         }
     }
+
+    /**
+     * Returns a new {@link Future} wrapping the given list of futures and returning a list of their results.
+     */
+    public static Future<List> allOf(Collection<Future> futures)
+    {
+        if (futures.isEmpty())
+            return CompletableFuture.completedFuture(null);
+
+        return new Future<List>()
+        {
+            @Override
+            @SuppressWarnings("unchecked")
+            public List get() throws InterruptedException, ExecutionException
+            {
+                List result = new ArrayList<>(futures.size());
+                for (Future current : futures)
+                {
+                    result.add(current.get());
+                }
+                return result;
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public List get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
+            {
+                List result = new ArrayList<>(futures.size());
+                long deadline = System.nanoTime() + TimeUnit.NANOSECONDS.convert(timeout, unit);
+                for (Future current : futures)
+                {
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining <= 0)
+                        throw new TimeoutException();
+
+                    result.add(current.get(remaining, TimeUnit.NANOSECONDS));
+                }
+                return result;
+            }
+
+            @Override
+            public boolean cancel(boolean mayInterruptIfRunning)
+            {
+                for (Future current : futures)
+                {
+                    if (!current.cancel(mayInterruptIfRunning))
+                        return false;
+                }
+                return true;
+            }
+
+            @Override
+            public boolean isCancelled()
+            {
+                for (Future current : futures)
+                {
+                    if (!current.isCancelled())
+                        return false;
+                }
+                return true;
+            }
+
+            @Override
+            public boolean isDone()
+            {
+                for (Future current : futures)
+                {
+                    if (!current.isDone())
+                        return false;
+                }
+                return true;
+            }
+        };
+    }
+
     /**
      * Create a new instance of a partitioner defined in an SSTable Descriptor
      * @param desc Descriptor of an sstable

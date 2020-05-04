@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
@@ -794,7 +795,7 @@ public class OutboundConnection
                             out = new DataOutputBufferFixed(sending.buffer);
                         }
 
-                        Tracing.instance.traceOutgoingMessage(next, settings.connectTo);
+                        Tracing.instance.traceOutgoingMessage(next, messageSize, settings.connectTo);
                         Message.serializer.serialize(next, out, messagingVersion);
 
                         if (sending.length() != sendingBytes + messageSize)
@@ -962,7 +963,7 @@ public class OutboundConnection
                 if (messageSize > DatabaseDescriptor.getInternodeMaxMessageSizeInBytes())
                     throw new Message.OversizedMessageException(messageSize);
 
-                Tracing.instance.traceOutgoingMessage(send, established.settings.connectTo);
+                Tracing.instance.traceOutgoingMessage(send, messageSize, established.settings.connectTo);
                 Message.serializer.serialize(send, out, established.messagingVersion);
 
                 if (out.position() != messageSize)
@@ -1560,8 +1561,8 @@ public class OutboundConnection
         Established established = state.established();
         Channel channel = established.channel;
         OutboundConnectionSettings settings = established.settings;
-        return SocketFactory.channelId(settings.from, (InetSocketAddress) channel.remoteAddress(),
-                                       settings.to, (InetSocketAddress) channel.localAddress(),
+        return SocketFactory.channelId(settings.from, (InetSocketAddress) channel.localAddress(),
+                                       settings.to, (InetSocketAddress) channel.remoteAddress(),
                                        type, channel.id().asShortText());
     }
 
@@ -1722,6 +1723,13 @@ public class OutboundConnection
         releaseCapacity(1, amount);
     }
 
+    @VisibleForTesting
+    void unsafeReleaseCapacity(long count, long amount)
+    {
+        releaseCapacity(count, amount);
+    }
+
+    @VisibleForTesting
     Limit unsafeGetEndpointReserveLimits()
     {
         return reserveCapacityInBytes.endpoint;

@@ -33,6 +33,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
 
+import org.apache.cassandra.dht.AbstractBounds;
 import org.apache.cassandra.locator.RangesAtEndpoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -660,12 +661,12 @@ public class CompactionManager implements CompactionManagerMBean
                     return true;
 
                 int diskIndex = diskBoundaries.getDiskIndex(sstable);
-                File diskLocation = diskBoundaries.directories.get(diskIndex).location;
                 PartitionPosition diskLast = diskBoundaries.positions.get(diskIndex);
 
                 // the location we get from directoryIndex is based on the first key in the sstable
                 // now we need to make sure the last key is less than the boundary as well:
-                return sstable.descriptor.directory.getAbsolutePath().startsWith(diskLocation.getAbsolutePath()) && sstable.last.compareTo(diskLast) <= 0;
+                Directories.DataDirectory dataDirectory = cfs.getDirectories().getDataDirectoryForFile(sstable.descriptor);
+                return diskBoundaries.directories.get(diskIndex).equals(dataDirectory) && sstable.last.compareTo(diskLast) <= 0;
             }
 
             @Override
@@ -929,8 +930,21 @@ public class CompactionManager implements CompactionManagerMBean
 
         for (Range<Token> tokenRange : tokenRangeCollection)
         {
-            Iterable<SSTableReader> ssTableReaders = View.sstablesInBounds(tokenRange.left.minKeyBound(), tokenRange.right.maxKeyBound(), tree);
-            Iterables.addAll(sstables, ssTableReaders);
+            if (!AbstractBounds.strictlyWrapsAround(tokenRange.left, tokenRange.right))
+            {
+                Iterable<SSTableReader> ssTableReaders = View.sstablesInBounds(tokenRange.left.minKeyBound(), tokenRange.right.maxKeyBound(), tree);
+                Iterables.addAll(sstables, ssTableReaders);
+            }
+            else
+            {
+                // Searching an interval tree will not return the correct results for a wrapping range
+                // so we have to unwrap it first
+                for (Range<Token> unwrappedRange : tokenRange.unwrap())
+                {
+                    Iterable<SSTableReader> ssTableReaders = View.sstablesInBounds(unwrappedRange.left.minKeyBound(), unwrappedRange.right.maxKeyBound(), tree);
+                    Iterables.addAll(sstables, ssTableReaders);
+                }
+            }
         }
         return sstables;
     }
@@ -1472,7 +1486,7 @@ public class CompactionManager implements CompactionManagerMBean
                                   BooleanSupplier isCancelled)
     {
         int originalCount = txn.originals().size();
-        logger.info("Performing anticompaction on {} sstables", originalCount);
+        logger.info("Performing anticompaction on {} sstables for {}", originalCount, pendingRepair);
 
         //Group SSTables
         Set<SSTableReader> sstables = txn.originals();
@@ -1495,9 +1509,8 @@ public class CompactionManager implements CompactionManagerMBean
                 antiCompactedSSTableCount += antiCompacted;
             }
         }
-
-        String format = "Anticompaction completed successfully, anticompacted from {} to {} sstable(s).";
-        logger.info(format, originalCount, antiCompactedSSTableCount);
+        String format = "Anticompaction completed successfully, anticompacted from {} to {} sstable(s) for {}.";
+        logger.info(format, originalCount, antiCompactedSSTableCount, pendingRepair);
     }
 
     @VisibleForTesting
@@ -1523,7 +1536,7 @@ public class CompactionManager implements CompactionManagerMBean
             return 0;
         }
 
-        logger.info("Anticompacting {}", txn);
+        logger.info("Anticompacting {} in {}.{} for {}", txn.originals(), cfs.keyspace.getName(), cfs.getTableName(), pendingRepair);
         Set<SSTableReader> sstableAsSet = txn.originals();
 
         File destination = cfs.getDirectories().getWriteableLocationAsFile(cfs.getExpectedCompactedFileSize(sstableAsSet, OperationType.ANTICOMPACTION));
@@ -1613,8 +1626,6 @@ public class CompactionManager implements CompactionManagerMBean
                 }
             }
 
-            List<SSTableReader> anticompactedSSTables = new ArrayList<>();
-
             fullWriter.prepareToCommit();
             transWriter.prepareToCommit();
             unrepairedWriter.prepareToCommit();
@@ -1622,16 +1633,23 @@ public class CompactionManager implements CompactionManagerMBean
             txn.obsoleteOriginals();
             txn.prepareToCommit();
 
-            anticompactedSSTables.addAll(fullWriter.finished());
-            anticompactedSSTables.addAll(transWriter.finished());
-            anticompactedSSTables.addAll(unrepairedWriter.finished());
+            List<SSTableReader> fullSSTables = new ArrayList<>(fullWriter.finished());
+            List<SSTableReader> transSSTables = new ArrayList<>(transWriter.finished());
+            List<SSTableReader> unrepairedSSTables = new ArrayList<>(unrepairedWriter.finished());
 
             fullWriter.commit();
             transWriter.commit();
             unrepairedWriter.commit();
             txn.commit();
-
-            return anticompactedSSTables.size();
+            logger.info("Anticompacted {} in {}.{} to full = {}, transient = {}, unrepaired = {} for {}",
+                        sstableAsSet,
+                        cfs.keyspace.getName(),
+                        cfs.getTableName(),
+                        fullSSTables,
+                        transSSTables,
+                        unrepairedSSTables,
+                        pendingRepair);
+            return fullSSTables.size() + transSSTables.size() + unrepairedSSTables.size();
         }
         catch (Throwable e)
         {
@@ -2063,6 +2081,18 @@ public class CompactionManager implements CompactionManagerMBean
     public void setMaximumValidatorThreads(int number)
     {
         validationExecutor.setMaximumPoolSize(number);
+    }
+
+    public boolean getDisableSTCSInL0()
+    {
+        return DatabaseDescriptor.getDisableSTCSInL0();
+    }
+
+    public void setDisableSTCSInL0(boolean disabled)
+    {
+        if (disabled != DatabaseDescriptor.getDisableSTCSInL0())
+            logger.info("Changing STCS in L0 disabled from {} to {}", DatabaseDescriptor.getDisableSTCSInL0(), disabled);
+        DatabaseDescriptor.setDisableSTCSInL0(disabled);
     }
 
     public int getCoreViewBuildThreads()

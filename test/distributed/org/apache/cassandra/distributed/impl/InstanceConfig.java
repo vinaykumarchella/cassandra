@@ -18,15 +18,9 @@
 
 package org.apache.cassandra.distributed.impl;
 
-import org.apache.cassandra.config.Config;
-import org.apache.cassandra.config.ParameterizedClass;
-import org.apache.cassandra.distributed.api.Feature;
-import org.apache.cassandra.distributed.api.IInstanceConfig;
-import org.apache.cassandra.locator.InetAddressAndPort;
-import org.apache.cassandra.locator.SimpleSeedProvider;
-
 import java.io.File;
 import java.lang.reflect.Field;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -34,10 +28,22 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.function.Function;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.apache.cassandra.distributed.api.Feature;
+import org.apache.cassandra.distributed.api.IInstanceConfig;
+import org.apache.cassandra.distributed.shared.NetworkTopology;
+import org.apache.cassandra.distributed.shared.Versions;
+import org.apache.cassandra.locator.InetAddressAndPort;
+import org.apache.cassandra.locator.SimpleSeedProvider;
 
 public class InstanceConfig implements IInstanceConfig
 {
     private static final Object NULL = new Object();
+    private static final Logger logger = LoggerFactory.getLogger(InstanceConfig.class);
 
     public final int num;
     public int num() { return num; }
@@ -53,34 +59,13 @@ public class InstanceConfig implements IInstanceConfig
 
     private volatile InetAddressAndPort broadcastAddressAndPort;
 
-    @Override
-    public InetAddressAndPort broadcastAddressAndPort()
-    {
-        if (broadcastAddressAndPort == null)
-        {
-            broadcastAddressAndPort = getAddressAndPortFromConfig("broadcast_address", "storage_port");
-        }
-        return broadcastAddressAndPort;
-    }
-
-    private InetAddressAndPort getAddressAndPortFromConfig(String addressProp, String portProp)
-    {
-        try
-        {
-            return InetAddressAndPort.getByNameOverrideDefaults(getString(addressProp), getInt(portProp));
-        }
-        catch (UnknownHostException e)
-        {
-            throw new IllegalStateException(e);
-        }
-    }
-
     private InstanceConfig(int num,
                            NetworkTopology networkTopology,
                            String broadcast_address,
                            String listen_address,
                            String broadcast_rpc_address,
                            String rpc_address,
+                           String seedIp,
                            String saved_caches_directory,
                            String[] data_file_directories,
                            String commitlog_directory,
@@ -91,7 +76,8 @@ public class InstanceConfig implements IInstanceConfig
         this.num = num;
         this.networkTopology = networkTopology;
         this.hostId = java.util.UUID.randomUUID();
-        this    .set("broadcast_address", broadcast_address)
+        this    .set("num_tokens", 1)
+                .set("broadcast_address", broadcast_address)
                 .set("listen_address", listen_address)
                 .set("broadcast_rpc_address", broadcast_rpc_address)
                 .set("rpc_address", rpc_address)
@@ -114,7 +100,7 @@ public class InstanceConfig implements IInstanceConfig
                 .set("storage_port", 7012)
                 .set("endpoint_snitch", DistributedTestSnitch.class.getName())
                 .set("seed_provider", new ParameterizedClass(SimpleSeedProvider.class.getName(),
-                        Collections.singletonMap("seeds", "127.0.0.1:7012")))
+                                                             Collections.singletonMap("seeds", seedIp + ":7012")))
                 // required settings for dtest functionality
                 .set("diagnostic_events_enabled", true)
                 .set("auto_bootstrap", false)
@@ -135,6 +121,44 @@ public class InstanceConfig implements IInstanceConfig
         this.hostId = copy.hostId;
         this.featureFlags = copy.featureFlags;
         this.broadcastAddressAndPort = copy.broadcastAddressAndPort;
+    }
+
+
+    @Override
+    public InetSocketAddress broadcastAddress()
+    {
+        return DistributedTestSnitch.fromCassandraInetAddressAndPort(getBroadcastAddressAndPort());
+    }
+
+    protected InetAddressAndPort getBroadcastAddressAndPort()
+    {
+        if (broadcastAddressAndPort == null)
+        {
+            broadcastAddressAndPort = getAddressAndPortFromConfig("broadcast_address", "storage_port");
+        }
+        return broadcastAddressAndPort;
+    }
+
+    private InetAddressAndPort getAddressAndPortFromConfig(String addressProp, String portProp)
+    {
+        try
+        {
+            return InetAddressAndPort.getByNameOverrideDefaults(getString(addressProp), getInt(portProp));
+        }
+        catch (UnknownHostException e)
+        {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public String localRack()
+    {
+        return networkTopology().localRack(broadcastAddress());
+    }
+
+    public String localDatacenter()
+    {
+        return networkTopology().localDC(broadcastAddress());
     }
 
     public InstanceConfig with(Feature featureFlag)
@@ -160,8 +184,6 @@ public class InstanceConfig implements IInstanceConfig
         if (value == null)
             value = NULL;
 
-        // test value
-        propagate(new Config(), fieldName, value, false);
         params.put(fieldName, value);
         return this;
     }
@@ -176,22 +198,25 @@ public class InstanceConfig implements IInstanceConfig
         return this;
     }
 
-    public void propagateIfSet(Object writeToConfig, String fieldName)
-    {
-        if (params.containsKey(fieldName))
-            propagate(writeToConfig, fieldName, params.get(fieldName), true);
-    }
-
-    public void propagate(Object writeToConfig)
+    public void propagate(Object writeToConfig, Map<Class<?>, Function<Object, Object>> mapping)
     {
         for (Map.Entry<String, Object> e : params.entrySet())
-            propagate(writeToConfig, e.getKey(), e.getValue(), true);
+            propagate(writeToConfig, e.getKey(), e.getValue(), mapping);
     }
 
-    private void propagate(Object writeToConfig, String fieldName, Object value, boolean ignoreMissing)
+    public void validate()
+    {
+        if (((int) get("num_tokens")) > 1)
+            throw new IllegalArgumentException("In-JVM dtests do not support vnodes as of now.");
+    }
+
+    private void propagate(Object writeToConfig, String fieldName, Object value, Map<Class<?>, Function<Object, Object>> mapping)
     {
         if (value == NULL)
             value = null;
+
+        if (mapping != null && mapping.containsKey(value.getClass()))
+            value = mapping.get(value.getClass()).apply(value);
 
         Class<?> configClass = writeToConfig.getClass();
         Field valueField;
@@ -201,8 +226,7 @@ public class InstanceConfig implements IInstanceConfig
         }
         catch (NoSuchFieldException e)
         {
-            if (!ignoreMissing)
-                throw new IllegalStateException(e);
+            logger.warn("No such field: {} in config class {}", fieldName, configClass);
             return;
         }
 
@@ -239,7 +263,7 @@ public class InstanceConfig implements IInstanceConfig
         return (String)params.get(name);
     }
 
-    public static InstanceConfig generate(int nodeNum, String ipAddress, NetworkTopology networkTopology, File root, String token)
+    public static InstanceConfig generate(int nodeNum, String ipAddress, NetworkTopology networkTopology, File root, String token, String seedIp)
     {
         return new InstanceConfig(nodeNum,
                                   networkTopology,
@@ -247,6 +271,7 @@ public class InstanceConfig implements IInstanceConfig
                                   ipAddress,
                                   ipAddress,
                                   ipAddress,
+                                  seedIp,
                                   String.format("%s/node%d/saved_caches", root, nodeNum),
                                   new String[] { String.format("%s/node%d/data", root, nodeNum) },
                                   String.format("%s/node%d/commitlog", root, nodeNum),

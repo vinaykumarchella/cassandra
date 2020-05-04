@@ -46,6 +46,7 @@ import com.datastax.driver.core.DataType;
 import com.datastax.driver.core.ResultSet;
 
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.audit.AuditLogManager;
 import org.apache.cassandra.concurrent.ScheduledExecutors;
 import org.apache.cassandra.db.virtual.VirtualKeyspaceRegistry;
 import org.apache.cassandra.db.virtual.VirtualSchemaKeyspace;
@@ -202,6 +203,7 @@ public abstract class CQLTester
 
         DatabaseDescriptor.daemonInitialization();
         DatabaseDescriptor.setTransientReplicationEnabledUnsafe(true);
+        CommitLog.instance.start();
 
         // Cleanup first
         try
@@ -235,12 +237,14 @@ public abstract class CQLTester
 
         Keyspace.setInitialized();
         SystemKeyspace.persistLocalMetadata();
+        AuditLogManager.instance.initialize();
         isServerPrepared = true;
     }
 
     public static void cleanupAndLeaveDirs() throws IOException
     {
         // We need to stop and unmap all CLS instances prior to cleanup() or we'll get failures on Windows.
+        CommitLog.instance.start();
         CommitLog.instance.stopUnsafe(true);
         mkdirs();
         cleanup();
@@ -647,6 +651,20 @@ public abstract class CQLTester
         return currentKeyspace;
     }
 
+    protected void alterKeyspace(String query)
+    {
+        String fullQuery = String.format(query, currentKeyspace());
+        logger.info(fullQuery);
+        schemaChange(fullQuery);
+    }
+ 
+    protected void alterKeyspaceMayThrow(String query) throws Throwable
+    {
+        String fullQuery = String.format(query, currentKeyspace());
+        logger.info(fullQuery);
+        QueryProcessor.executeOnceInternal(fullQuery);
+    }
+    
     protected String createKeyspaceName()
     {
         String currentKeyspace = "keyspace_" + seqNumber.getAndIncrement();
@@ -1695,7 +1713,7 @@ public abstract class CQLTester
         return m;
     }
 
-    protected com.datastax.driver.core.TupleType tupleTypeOf(ProtocolVersion protocolVersion, DataType...types)
+    protected com.datastax.driver.core.TupleType tupleTypeOf(ProtocolVersion protocolVersion, com.datastax.driver.core.DataType...types)
     {
         requireNetwork();
         return clusters.get(protocolVersion).getMetadata().newTupleType(types);

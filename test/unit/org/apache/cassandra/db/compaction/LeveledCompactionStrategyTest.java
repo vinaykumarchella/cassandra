@@ -17,13 +17,16 @@
  */
 package org.apache.cassandra.db.compaction;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
@@ -52,6 +55,7 @@ import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.notifications.SSTableAddedNotification;
 import org.apache.cassandra.notifications.SSTableRepairStatusChanged;
 import org.apache.cassandra.repair.ValidationManager;
+import org.apache.cassandra.schema.MockSchema;
 import org.apache.cassandra.streaming.PreviewKind;
 import org.apache.cassandra.repair.RepairJobDesc;
 import org.apache.cassandra.repair.Validator;
@@ -456,6 +460,58 @@ public class LeveledCompactionStrategyTest
 
         // the 11 tables containing key1 should all compact to 1 table
         assertEquals(1, cfs.getLiveSSTables().size());
+        // Set it up again
+        cfs.truncateBlocking();
+
+        // create 10 sstables that contain data for both key1 and key2
+        for (int i = 0; i < numIterations; i++)
+        {
+            for (DecoratedKey key : keys)
+            {
+                UpdateBuilder update = UpdateBuilder.create(cfs.metadata(), key);
+                for (int c = 0; c < columns; c++)
+                    update.newRow("column" + c).add("val", value);
+                update.applyUnsafe();
+            }
+            cfs.forceBlockingFlush();
+        }
+
+        // create 20 more sstables with 10 containing data for key1 and other 10 containing data for key2
+        for (int i = 0; i < numIterations; i++)
+        {
+            for (DecoratedKey key : keys)
+            {
+                UpdateBuilder update = UpdateBuilder.create(cfs.metadata(), key);
+                for (int c = 0; c < columns; c++)
+                    update.newRow("column" + c).add("val", value);
+                update.applyUnsafe();
+                cfs.forceBlockingFlush();
+            }
+        }
+
+        // We should have a total of 30 sstables again
+        assertEquals(30, cfs.getLiveSSTables().size());
+
+        // This time, we're going to make sure the token range wraps around, to cover the full range
+        Range<Token> wrappingRange;
+        if (key1.getToken().compareTo(key2.getToken()) < 0)
+        {
+            wrappingRange = new Range<>(key2.getToken(), key1.getToken());
+        }
+        else
+        {
+            wrappingRange = new Range<>(key1.getToken(), key2.getToken());
+        }
+        Collection<Range<Token>> wrappingRanges = new ArrayList<>(Arrays.asList(wrappingRange));
+        cfs.forceCompactionForTokenRange(wrappingRanges);
+
+        while(CompactionManager.instance.isCompacting(Arrays.asList(cfs), (sstable) -> true))
+        {
+            Thread.sleep(100);
+        }
+
+        // should all compact to 1 table
+        assertEquals(1, cfs.getLiveSSTables().size());
     }
 
     @Test
@@ -489,5 +545,71 @@ public class LeveledCompactionStrategyTest
                        sstable.getMaxTimestamp() > lastMaxTimeStamp);
             lastMaxTimeStamp = sstable.getMaxTimestamp();
         }
+    }
+
+    @Test
+    public void testDisableSTCSInL0() throws IOException
+    {
+        /*
+        First creates a bunch of sstables in L1, then overloads L0 with 50 sstables. Now with STCS in L0 enabled
+        we should get a compaction task where the target level is 0, then we disable STCS-in-L0 and make sure that
+        the compaction task we get targets L1 or higher.
+         */
+        ColumnFamilyStore cfs = MockSchema.newCFS();
+        Map<String, String> localOptions = new HashMap<>();
+        localOptions.put("class", "LeveledCompactionStrategy");
+        localOptions.put("sstable_size_in_mb", "1");
+        cfs.setCompactionParameters(localOptions);
+        List<SSTableReader> sstables = new ArrayList<>();
+        for (int i = 0; i < 11; i++)
+        {
+            SSTableReader l1sstable = MockSchema.sstable(i, 1 * 1024 * 1024, cfs);
+            l1sstable.descriptor.getMetadataSerializer().mutateLevel(l1sstable.descriptor, 1);
+            l1sstable.reloadSSTableMetadata();
+            sstables.add(l1sstable);
+        }
+
+        for (int i = 100; i < 150; i++)
+            sstables.add(MockSchema.sstable(i, 1 * 1024 * 1024, cfs));
+
+        cfs.disableAutoCompaction();
+        cfs.addSSTables(sstables);
+        assertEquals(0, getTaskLevel(cfs));
+
+        try
+        {
+            CompactionManager.instance.setDisableSTCSInL0(true);
+            assertTrue(getTaskLevel(cfs) > 0);
+        }
+        finally
+        {
+            CompactionManager.instance.setDisableSTCSInL0(false);
+        }
+    }
+
+    private int getTaskLevel(ColumnFamilyStore cfs)
+    {
+        int level = -1;
+        for (List<AbstractCompactionStrategy> strategies : cfs.getCompactionStrategyManager().getStrategies())
+        {
+            for (AbstractCompactionStrategy strategy : strategies)
+            {
+                AbstractCompactionTask task = strategy.getNextBackgroundTask(0);
+                if (task != null)
+                {
+                    try
+                    {
+                        assertTrue(task instanceof LeveledCompactionTask);
+                        LeveledCompactionTask lcsTask = (LeveledCompactionTask) task;
+                        level = Math.max(level, lcsTask.getLevel());
+                    }
+                    finally
+                    {
+                        task.transaction.abort();
+                    }
+                }
+            }
+        }
+        return level;
     }
 }

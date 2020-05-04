@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -106,6 +107,7 @@ import static org.apache.cassandra.repair.consistent.ConsistentSession.State.*;
 public class LocalSessions
 {
     private static final Logger logger = LoggerFactory.getLogger(LocalSessions.class);
+    private static final Set<Listener> listeners = new CopyOnWriteArraySet<>();
 
     /**
      * Amount of time a session can go without any activity before we start checking the status of other
@@ -275,7 +277,7 @@ public class LocalSessions
                 {
                     if (!sessionHasData(session))
                     {
-                        logger.debug("Auto deleting repair session {}", session);
+                        logger.info("Auto deleting repair session {}", session);
                         deleteSession(session.sessionID);
                     }
                     else
@@ -441,7 +443,7 @@ public class LocalSessions
         return new LocalSession(builder);
     }
 
-    protected LocalSession getSession(UUID sessionID)
+    public LocalSession getSession(UUID sessionID)
     {
         return sessions.get(sessionID);
     }
@@ -520,6 +522,8 @@ public class LocalSessions
             {
                 sessionCompleted(session);
             }
+            for (Listener listener : listeners)
+                listener.onIRStateChange(session);
         }
     }
 
@@ -550,7 +554,7 @@ public class LocalSessions
 
     public synchronized void deleteSession(UUID sessionID)
     {
-        logger.debug("Deleting local repair session {}", sessionID);
+        logger.info("Deleting local repair session {}", sessionID);
         LocalSession session = getSession(sessionID);
         Preconditions.checkArgument(session.isCompleted(), "Cannot delete incomplete sessions");
 
@@ -675,7 +679,7 @@ public class LocalSessions
         LocalSession session = getSession(sessionID);
         if (session != null && session.getState() != REPAIRING)
         {
-            logger.debug("Setting local incremental repair session {} to REPAIRING", session);
+            logger.info("Setting local incremental repair session {} to REPAIRING", session);
             setStateAndSave(session, REPAIRING);
         }
     }
@@ -687,7 +691,7 @@ public class LocalSessions
         LocalSession session = getSession(sessionID);
         if (session == null)
         {
-            logger.debug("Received FinalizePropose message for unknown repair session {}, responding with failure", sessionID);
+            logger.info("Received FinalizePropose message for unknown repair session {}, responding with failure", sessionID);
             sendMessage(from, Message.out(FAILED_SESSION_MSG, new FailSession(sessionID)));
             return;
         }
@@ -706,11 +710,11 @@ public class LocalSessions
             syncTable();
 
             sendMessage(from, Message.out(FINALIZE_PROMISE_MSG, new FinalizePromise(sessionID, getBroadcastAddressAndPort(), true)));
-            logger.debug("Received FinalizePropose message for incremental repair session {}, responded with FinalizePromise", sessionID);
+            logger.info("Received FinalizePropose message for incremental repair session {}, responded with FinalizePromise", sessionID);
         }
         catch (IllegalArgumentException e)
         {
-            logger.error(String.format("Error handling FinalizePropose message for %s", session), e);
+            logger.error("Error handling FinalizePropose message for {}", session, e);
             failSession(sessionID);
         }
     }
@@ -758,7 +762,7 @@ public class LocalSessions
 
     public void sendStatusRequest(LocalSession session)
     {
-        logger.debug("Attempting to learn the outcome of unfinished local incremental repair session {}", session.sessionID);
+        logger.info("Attempting to learn the outcome of unfinished local incremental repair session {}", session.sessionID);
         Message<StatusRequest> request = Message.out(STATUS_REQ, new StatusRequest(session.sessionID));
 
         for (InetAddressAndPort participant : session.participants)
@@ -777,13 +781,13 @@ public class LocalSessions
         LocalSession session = getSession(sessionID);
         if (session == null)
         {
-            logger.warn("Received status response message for unknown session {}", sessionID);
+            logger.warn("Received status request message for unknown session {}", sessionID);
             sendMessage(from, Message.out(STATUS_RSP, new StatusResponse(sessionID, FAILED)));
         }
         else
         {
             sendMessage(from, Message.out(STATUS_RSP, new StatusResponse(sessionID, session.getState())));
-            logger.debug("Responding to status response message for incremental repair session {} with local state {}", sessionID, session.getState());
+            logger.info("Responding to status response message for incremental repair session {} with local state {}", sessionID, session.getState());
        }
     }
 
@@ -807,7 +811,7 @@ public class LocalSessions
         }
         else
         {
-            logger.debug("Received StatusResponse for repair session {} with state {}, which is not actionable. Doing nothing.", sessionID, response.state);
+            logger.info("Received StatusResponse for repair session {} with state {}, which is not actionable. Doing nothing.", sessionID, response.state);
         }
     }
 
@@ -867,5 +871,20 @@ public class LocalSessions
         {
             throw new IllegalStateException("Cannot get final repaired at value for in progress session: " + session);
         }
+    }
+
+    public static void registerListener(Listener listener)
+    {
+        listeners.add(listener);
+    }
+
+    public static void unregisterListener(Listener listener)
+    {
+        listeners.remove(listener);
+    }
+
+    public interface Listener
+    {
+        void onIRStateChange(LocalSession session);
     }
 }

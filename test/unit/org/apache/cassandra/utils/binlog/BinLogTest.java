@@ -36,8 +36,6 @@ import net.openhft.chronicle.queue.ExcerptTailer;
 import net.openhft.chronicle.queue.RollCycles;
 import net.openhft.chronicle.wire.WireOut;
 import org.apache.cassandra.Util;
-import org.apache.cassandra.audit.AuditLogOptions;
-import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.io.util.FileUtils;
 
 import static org.junit.Assert.assertEquals;
@@ -65,8 +63,12 @@ public class BinLogTest
     public void setUp() throws Exception
     {
         path = tempDir();
-        binLog = new BinLog(path, RollCycles.TEST_SECONDLY, 10, new DeletingArchiver(1024 * 1024 * 128));
-        binLog.start();
+        binLog = new BinLog.Builder().path(path)
+                                     .rollCycle(RollCycles.TEST_SECONDLY.toString())
+                                     .maxQueueWeight(10)
+                                     .maxLogSize(1024 * 1024 * 128)
+                                     .blocking(false)
+                                     .build(false);
     }
 
     @After
@@ -85,25 +87,25 @@ public class BinLogTest
     @Test(expected = NullPointerException.class)
     public void testConstructorNullPath() throws Exception
     {
-        new BinLog(null, RollCycles.TEST_SECONDLY, 1, new DeletingArchiver(1));
+        new BinLog.Builder().path(null).build(false);
     }
 
     @Test(expected = NullPointerException.class)
     public void testConstructorNullRollCycle() throws Exception
     {
-        new BinLog(tempDir(), null, 1, new DeletingArchiver(1));
+        new BinLog.Builder().path(tempDir()).rollCycle(null).build(false);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testConstructorZeroWeight() throws Exception
     {
-        new BinLog(tempDir(), RollCycles.TEST_SECONDLY, 0, new DeletingArchiver(1));
+        new BinLog.Builder().path(tempDir()).rollCycle(RollCycles.TEST_SECONDLY.toString()).maxQueueWeight(0).build(false);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testConstructorLogSize() throws Exception
     {
-        new BinLog(tempDir(), RollCycles.TEST_SECONDLY, 0, new DeletingArchiver(1));
+        new BinLog.Builder().path(tempDir()).rollCycle(RollCycles.TEST_SECONDLY.toString()).maxLogSize(0).build(false);
     }
 
     /**
@@ -122,7 +124,17 @@ public class BinLogTest
                 releaseCount.incrementAndGet();
             }
 
-            public void writeMarshallable(WireOut wire)
+            protected long version()
+            {
+                return 0;
+            }
+
+            protected String type()
+            {
+                return "test";
+            }
+
+            public void writeMarshallablePayload(WireOut wire)
             {
                 try
                 {
@@ -136,8 +148,17 @@ public class BinLogTest
         });
         binLog.put(new BinLog.ReleaseableWriteMarshallable()
         {
+            protected long version()
+            {
+                return 0;
+            }
 
-            public void writeMarshallable(WireOut wire)
+            protected String type()
+            {
+                return "test";
+            }
+
+            public void writeMarshallablePayload(WireOut wire)
             {
 
             }
@@ -182,7 +203,17 @@ public class BinLogTest
                 released.release();
             }
 
-            public void writeMarshallable(WireOut wire)
+            protected long version()
+            {
+                return 0;
+            }
+
+            protected String type()
+            {
+                return "test";
+            }
+
+            public void writeMarshallablePayload(WireOut wire)
             {
 
             }
@@ -227,7 +258,17 @@ public class BinLogTest
                 {
                 }
 
-                public void writeMarshallable(WireOut wire)
+                protected long version()
+                {
+                    return 0;
+                }
+
+                protected String type()
+                {
+                    return "test";
+                }
+
+                public void writeMarshallablePayload(WireOut wire)
                 {
                     //Notify the bing log thread is about to block
                     binLogBlocked.release();
@@ -303,7 +344,17 @@ public class BinLogTest
                 {
                 }
 
-                public void writeMarshallable(WireOut wire)
+                protected long version()
+                {
+                    return 0;
+                }
+
+                protected String type()
+                {
+                    return "test";
+                }
+
+                public void writeMarshallablePayload(WireOut wire)
                 {
                     //Notify the bing log thread is about to block
                     binLogBlocked.release();
@@ -347,8 +398,7 @@ public class BinLogTest
     public void testCleanupOnOversize() throws Exception
     {
         tearDown();
-        binLog = new BinLog(path, RollCycles.TEST_SECONDLY, 1, new DeletingArchiver(10000));
-        binLog.start();
+        binLog = new BinLog.Builder().path(path).rollCycle(RollCycles.TEST_SECONDLY.toString()).maxQueueWeight(1).maxLogSize(10000).blocking(false).build(false);
         for (int ii = 0; ii < 5; ii++)
         {
             binLog.put(record(String.valueOf(ii)));
@@ -420,7 +470,17 @@ public class BinLogTest
                 //Do nothing
             }
 
-            public void writeMarshallable(WireOut wire)
+            protected long version()
+            {
+                return 0;
+            }
+
+            protected String type()
+            {
+                return "test";
+            }
+
+            public void writeMarshallablePayload(WireOut wire)
             {
                 wire.write("text").text(text);
             }

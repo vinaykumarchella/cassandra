@@ -25,7 +25,6 @@ import java.nio.ByteBuffer;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
-import com.google.common.hash.Hasher;
 
 import net.nicoulaj.compilecommand.annotations.DontInline;
 import org.apache.cassandra.exceptions.UnknownColumnException;
@@ -37,7 +36,6 @@ import org.apache.cassandra.db.marshal.UTF8Type;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.HashingUtils;
 import org.apache.cassandra.utils.SearchIterator;
 import org.apache.cassandra.utils.btree.BTree;
 import org.apache.cassandra.utils.btree.BTreeSearchIterator;
@@ -55,7 +53,7 @@ public class Columns extends AbstractCollection<ColumnMetadata> implements Colle
     public static final Serializer serializer = new Serializer();
     public static final Columns NONE = new Columns(BTree.empty(), 0);
 
-    private static final ColumnMetadata FIRST_COMPLEX_STATIC =
+    public static final ColumnMetadata FIRST_COMPLEX_STATIC =
         new ColumnMetadata("",
                            "",
                            ColumnIdentifier.getInterned(ByteBufferUtil.EMPTY_BYTE_BUFFER, UTF8Type.instance),
@@ -63,7 +61,7 @@ public class Columns extends AbstractCollection<ColumnMetadata> implements Colle
                            ColumnMetadata.NO_POSITION,
                            ColumnMetadata.Kind.STATIC);
 
-    private static final ColumnMetadata FIRST_COMPLEX_REGULAR =
+    public static final ColumnMetadata FIRST_COMPLEX_REGULAR =
         new ColumnMetadata("",
                            "",
                            ColumnIdentifier.getInterned(ByteBufferUtil.EMPTY_BYTE_BUFFER, UTF8Type.instance),
@@ -375,20 +373,19 @@ public class Columns extends AbstractCollection<ColumnMetadata> implements Colle
         return column -> iter.next(column) != null;
     }
 
-    public void digest(Hasher hasher)
+    public void digest(Digest digest)
     {
         for (ColumnMetadata c : this)
-            HashingUtils.updateBytes(hasher, c.name.bytes.duplicate());
+            digest.update(c.name.bytes);
     }
 
     /**
      * Apply a function to each column definition in forwards or reversed order.
      * @param function
-     * @param reversed
      */
-    public void apply(Consumer<ColumnMetadata> function, boolean reversed)
+    public void apply(Consumer<ColumnMetadata> function)
     {
-        BTree.apply(columns, function, reversed);
+        BTree.apply(columns, function);
     }
 
     @Override

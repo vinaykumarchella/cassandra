@@ -348,6 +348,31 @@ public class CassandraIndexTest extends CQLTester
 
         assertEmpty(execute("SELECT * FROM %s WHERE s = ? AND token(k) < token(?)", "s0", "k0"));
         assertEmpty(execute("SELECT * FROM %s WHERE s = ? AND token(k) < token(?)", "s1", "k1"));
+
+        row1 = row("s0");
+        row2 = row("s0");
+        row3 = row("s1");
+        row4 = row("s1");
+
+        assertRows(execute("SELECT s FROM %s WHERE s = ?", "s0"), row1, row2);
+        assertRows(execute("SELECT s FROM %s WHERE s = ?", "s1"), row3, row4);
+
+        assertRows(execute("SELECT s FROM %s WHERE s = ? AND token(k) >= token(?)", "s0", "k0"), row1, row2);
+        assertRows(execute("SELECT s FROM %s WHERE s = ? AND token(k) >= token(?)", "s1", "k1"), row3, row4);
+
+        assertEmpty(execute("SELECT s FROM %s WHERE s = ? AND token(k) < token(?)", "s0", "k0"));
+        assertEmpty(execute("SELECT s FROM %s WHERE s = ? AND token(k) < token(?)", "s1", "k1"));
+
+        dropIndex(String.format("DROP INDEX %s.sc_index", keyspace()));
+
+        assertRows(execute("SELECT s FROM %s WHERE s = ? ALLOW FILTERING", "s0"), row1, row2);
+        assertRows(execute("SELECT s FROM %s WHERE s = ? ALLOW FILTERING", "s1"), row3, row4);
+
+        assertRows(execute("SELECT s FROM %s WHERE s = ? AND token(k) >= token(?) ALLOW FILTERING", "s0", "k0"), row1, row2);
+        assertRows(execute("SELECT s FROM %s WHERE s = ? AND token(k) >= token(?) ALLOW FILTERING", "s1", "k1"), row3, row4);
+
+        assertEmpty(execute("SELECT s FROM %s WHERE s = ? AND token(k) < token(?) ALLOW FILTERING", "s0", "k0"));
+        assertEmpty(execute("SELECT s FROM %s WHERE s = ? AND token(k) < token(?) ALLOW FILTERING", "s1", "k1"));
     }
 
     @Test
@@ -491,21 +516,36 @@ public class CassandraIndexTest extends CQLTester
     @Test
     public void indexCorrectlyMarkedAsBuildAndRemoved() throws Throwable
     {
+        String selectBuiltIndexesQuery = String.format("SELECT * FROM %s.\"%s\"",
+                                                       SchemaConstants.SYSTEM_KEYSPACE_NAME,
+                                                       SystemKeyspace.BUILT_INDEXES);
+        UntypedResultSet rs = execute(selectBuiltIndexesQuery);
+        int initialSize = rs.size();
+
         String indexName = "build_remove_test_idx";
         String tableName = createTable("CREATE TABLE %s (a int, b int, c int, PRIMARY KEY (a, b))");
         createIndex(String.format("CREATE INDEX %s ON %%s(c)", indexName));
         waitForIndex(KEYSPACE, tableName, indexName);
         // check that there are no other rows in the built indexes table
-        assertRows(execute(String.format("SELECT * FROM %s.\"%s\"", SchemaConstants.SYSTEM_KEYSPACE_NAME, SystemKeyspace.BUILT_INDEXES)),
-                   row(KEYSPACE, indexName, null));
+        rs = execute(selectBuiltIndexesQuery);
+        int sizeAfterBuild = rs.size();
+        assertRowsIgnoringOrderAndExtra(rs, row(KEYSPACE, indexName, null));
 
         // rebuild the index and verify the built status table
         getCurrentColumnFamilyStore().rebuildSecondaryIndex(indexName);
         waitForIndex(KEYSPACE, tableName, indexName);
 
         // check that there are no other rows in the built indexes table
-        assertRows(execute(String.format("SELECT * FROM %s.\"%s\"", SchemaConstants.SYSTEM_KEYSPACE_NAME, SystemKeyspace.BUILT_INDEXES)),
-                   row(KEYSPACE, indexName, null ));
+        rs = execute(selectBuiltIndexesQuery);
+        assertEquals(sizeAfterBuild, rs.size());
+        assertRowsIgnoringOrderAndExtra(rs, row(KEYSPACE, indexName, null));
+
+        // check that dropping the index removes it from the built indexes table
+        dropIndex("DROP INDEX %s." + indexName);
+        rs = execute(selectBuiltIndexesQuery);
+        assertEquals(initialSize, rs.size());
+        rs.forEach(row -> assertFalse(row.getString("table_name").equals(KEYSPACE)  // table_name is actually keyspace
+                                      && row.getString("index_name").equals(indexName)));
     }
 
 

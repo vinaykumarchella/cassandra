@@ -58,6 +58,7 @@ import org.apache.cassandra.gms.IFailureDetectionEventListener;
 import org.apache.cassandra.gms.VersionedValue;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.locator.TokenMetadata;
+import org.apache.cassandra.metrics.RepairMetrics;
 import org.apache.cassandra.net.RequestCallback;
 import org.apache.cassandra.net.Message;
 import org.apache.cassandra.net.MessagingService;
@@ -70,7 +71,6 @@ import org.apache.cassandra.repair.consistent.CoordinatorSessions;
 import org.apache.cassandra.repair.consistent.LocalSessions;
 import org.apache.cassandra.repair.messages.*;
 import org.apache.cassandra.schema.TableId;
-import org.apache.cassandra.utils.CassandraVersion;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.MBeanWrapper;
 import org.apache.cassandra.utils.Pair;
@@ -143,6 +143,7 @@ public class ActiveRepairService implements IEndpointStateChangeSubscriber, IFai
                                                                  new NamedThreadFactory("Repair-Task"),
                                                                  "internal",
                                                                  new ThreadPoolExecutor.AbortPolicy());
+        RepairMetrics.init();
     }
 
     private final IFailureDetector failureDetector;
@@ -230,6 +231,9 @@ public class ActiveRepairService implements IEndpointStateChangeSubscriber, IFai
         // register listeners
         registerOnFdAndGossip(session);
 
+        if (session.previewKind == PreviewKind.REPAIRED)
+            LocalSessions.registerListener(session);
+
         // remove session at completion
         session.addListener(new Runnable()
         {
@@ -239,6 +243,7 @@ public class ActiveRepairService implements IEndpointStateChangeSubscriber, IFai
             public void run()
             {
                 sessions.remove(session.getId());
+                LocalSessions.unregisterListener(session);
             }
         }, MoreExecutors.directExecutor());
         session.start(executor);
@@ -517,12 +522,15 @@ public class ActiveRepairService implements IEndpointStateChangeSubscriber, IFai
     public synchronized ParentRepairSession removeParentRepairSession(UUID parentSessionId)
     {
         String snapshotName = parentSessionId.toString();
-        for (ColumnFamilyStore cfs : getParentRepairSession(parentSessionId).columnFamilyStores.values())
+        ParentRepairSession session = parentRepairSessions.remove(parentSessionId);
+        if (session == null)
+            return null;
+        for (ColumnFamilyStore cfs : session.columnFamilyStores.values())
         {
             if (cfs.snapshotExists(snapshotName))
                 cfs.clearSnapshot(snapshotName);
         }
-        return parentRepairSessions.remove(parentSessionId);
+        return session;
     }
 
     public void handleMessage(Message<? extends RepairMessage> message)

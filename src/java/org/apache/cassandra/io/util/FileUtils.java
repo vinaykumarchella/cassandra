@@ -43,16 +43,15 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.cassandra.utils.SyncUtil;
-
 import org.apache.cassandra.concurrent.ScheduledExecutors;
 import org.apache.cassandra.io.FSError;
 import org.apache.cassandra.io.FSErrorHandler;
 import org.apache.cassandra.io.FSReadError;
 import org.apache.cassandra.io.FSWriteError;
 import org.apache.cassandra.io.sstable.CorruptSSTableException;
+import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.JVMStabilityInspector;
-import org.apache.cassandra.utils.memory.MemoryUtil;
+import org.apache.cassandra.utils.SyncUtil;
 
 import static com.google.common.base.Throwables.propagate;
 import static org.apache.cassandra.utils.Throwables.maybeFail;
@@ -88,11 +87,19 @@ public final class FileUtils
             ByteBuffer buf = ByteBuffer.allocateDirect(1);
             clean(buf);
         }
+        catch (IllegalAccessException e)
+        {
+            logger.error("FATAL: Cassandra is unable to access required classes. This usually means it has been " +
+                "run without the aid of the standard startup scripts or the scripts have been edited. If this was " +
+                "intentional, and you are attempting to use Java 11+ you may need to add the --add-exports and " +
+                "--add-opens jvm options from either jvm11-server.options or jvm11-client.options");
+            throw new RuntimeException(e);  // causes ExceptionInInitializerError, will prevent startup
+        }
         catch (Throwable t)
         {
-            logger.error("FATAL: Cannot initialize optimized memory deallocator. Some data, both in-memory and on-disk, may live longer due to garbage collection.");
+            logger.error("FATAL: Cannot initialize optimized memory deallocator.");
             JVMStabilityInspector.inspectThrowable(t);
-            throw new RuntimeException(t);
+            throw new RuntimeException(t); // causes ExceptionInInitializerError, will prevent startup
         }
     }
 
@@ -175,19 +182,19 @@ public final class FileUtils
         return f;
     }
 
-    public static Throwable deleteWithConfirm(String filePath, boolean expect, Throwable accumulate)
+    public static Throwable deleteWithConfirm(String filePath, Throwable accumulate)
     {
-        return deleteWithConfirm(new File(filePath), expect, accumulate);
+        return deleteWithConfirm(new File(filePath), accumulate);
     }
 
-    public static Throwable deleteWithConfirm(File file, boolean expect, Throwable accumulate)
+    public static Throwable deleteWithConfirm(File file, Throwable accumulate)
     {
-        boolean exists = file.exists();
-        assert exists || !expect : "attempted to delete non-existing file " + file.getName();
         try
         {
-            if (exists)
-                Files.delete(file.toPath());
+            if (!StorageService.instance.isDaemonSetupCompleted())
+                logger.info("Deleting file during startup: {}", file);
+
+            Files.delete(file.toPath());
         }
         catch (Throwable t)
         {
@@ -210,7 +217,7 @@ public final class FileUtils
 
     public static void deleteWithConfirm(File file)
     {
-        maybeFail(deleteWithConfirm(file, true, null));
+        maybeFail(deleteWithConfirm(file, null));
     }
 
     public static void renameWithOutConfirm(String from, String to)
@@ -373,8 +380,8 @@ public final class FileUtils
     /** Return true if file is contained in folder */
     public static boolean isContained(File folder, File file)
     {
-        String folderPath = getCanonicalPath(folder);
-        String filePath = getCanonicalPath(file);
+        Path folderPath = Paths.get(getCanonicalPath(folder));
+        Path filePath = Paths.get(getCanonicalPath(file));
 
         return filePath.startsWith(folderPath);
     }
@@ -437,6 +444,9 @@ public final class FileUtils
 
     public static boolean delete(String file)
     {
+        if (!StorageService.instance.isDaemonSetupCompleted())
+            logger.info("Deleting file during startup: {}", file);
+
         File f = new File(file);
         return f.delete();
     }
@@ -445,6 +455,9 @@ public final class FileUtils
     {
         for ( File file : files )
         {
+            if (!StorageService.instance.isDaemonSetupCompleted())
+                logger.info("Deleting file during startup: {}", file);
+
             file.delete();
         }
     }

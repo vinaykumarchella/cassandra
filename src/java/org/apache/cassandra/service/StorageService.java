@@ -21,6 +21,7 @@ import java.io.*;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.*;
@@ -47,6 +48,8 @@ import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
 
 import org.apache.cassandra.dht.RangeStreamer.FetchReplica;
+import org.apache.cassandra.fql.FullQueryLogger;
+import org.apache.cassandra.fql.FullQueryLoggerOptions;
 import org.apache.cassandra.locator.ReplicaCollection.Builder.Conflict;
 import org.apache.commons.lang3.StringUtils;
 
@@ -96,6 +99,7 @@ import org.apache.cassandra.schema.ViewMetadata;
 import org.apache.cassandra.streaming.*;
 import org.apache.cassandra.tracing.TraceKeyspace;
 import org.apache.cassandra.transport.ProtocolVersion;
+import org.apache.cassandra.transport.Server;
 import org.apache.cassandra.utils.*;
 import org.apache.cassandra.utils.logging.LoggingSupportFactory;
 import org.apache.cassandra.utils.progress.ProgressEvent;
@@ -117,6 +121,7 @@ import static org.apache.cassandra.index.SecondaryIndexManager.getIndexName;
 import static org.apache.cassandra.index.SecondaryIndexManager.isIndexColumnFamily;
 import static org.apache.cassandra.net.NoPayload.noPayload;
 import static org.apache.cassandra.net.Verb.REPLICATION_DONE_REQ;
+import static org.apache.cassandra.schema.MigrationManager.evolveSystemKeyspace;
 
 /**
  * This abstraction contains the token/identifier of this node
@@ -684,7 +689,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
                 states.add(Pair.create(ApplicationState.STATUS, valueFactory.hibernate(true)));
                 Gossiper.instance.addLocalApplicationStates(states);
             }
-            doAuthSetup();
+            doAuthSetup(true);
             logger.info("Not joining ring as requested. Use JMX (StorageService->joinRing()) to initiate ring joining");
         }
 
@@ -993,9 +998,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             }
         }
 
-        // if we don't have system_traces keyspace at this point, then create it manually
-        ensureTraceKeyspace();
-        maybeAddOrUpdateKeyspace(SystemDistributedKeyspace.metadata());
+        setUpDistributedSystemKeyspaces();
 
         if (!isSurveyMode)
         {
@@ -1028,7 +1031,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
     @VisibleForTesting
     public void ensureTraceKeyspace()
     {
-        maybeAddOrUpdateKeyspace(TraceKeyspace.metadata());
+        evolveSystemKeyspace(TraceKeyspace.metadata(), TraceKeyspace.GENERATION).ifPresent(MigrationManager::announce);
     }
 
     public static boolean isReplacingSameAddress()
@@ -1105,14 +1108,15 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         setTokens(tokens);
 
         assert tokenMetadata.sortedTokens().size() > 0;
-        doAuthSetup();
+        doAuthSetup(false);
     }
 
-    private void doAuthSetup()
+    private void doAuthSetup(boolean setUpSchema)
     {
         if (!authSetupCalled.getAndSet(true))
         {
-            maybeAddOrUpdateKeyspace(AuthKeyspace.metadata());
+            if (setUpSchema)
+                evolveSystemKeyspace(AuthKeyspace.metadata(), AuthKeyspace.GENERATION).ifPresent(MigrationManager::announce);
 
             DatabaseDescriptor.getRoleManager().setup();
             DatabaseDescriptor.getAuthenticator().setup();
@@ -1128,59 +1132,16 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         return authSetupComplete;
     }
 
-    private void maybeAddKeyspace(KeyspaceMetadata ksm)
+    private void setUpDistributedSystemKeyspaces()
     {
-        try
-        {
-            /*
-             * We use timestamp of 0, intentionally, so that varying timestamps wouldn't cause schema mismatches on
-             * newly added nodes.
-             *
-             * Having the initial/default timestamp as 0 also allows users to make and persist changes to replication
-             * of our replicated system keyspaces.
-             *
-             * In case that we need to make incompatible changes to those kesypaces/tables, we'd need to bump the timestamp
-             * on per-keyspace/per-table basis. So far we've never needed to.
-             */
-            MigrationManager.announceNewKeyspace(ksm, 0, false);
-        }
-        catch (AlreadyExistsException e)
-        {
-            logger.debug("Attempted to create new keyspace {}, but it already exists", ksm.name);
-        }
-    }
+        Collection<Mutation> changes = new ArrayList<>(3);
 
-    /**
-     * Ensure the schema of a pseudo-system keyspace (a distributed system keyspace: traces, auth and the so-called distributedKeyspace),
-     * is up to date with what we expected (creating it if it doesn't exist and updating tables that may have been upgraded).
-     */
-    private void maybeAddOrUpdateKeyspace(KeyspaceMetadata expected)
-    {
-        // Note that want to deal with the keyspace and its table a bit differently: for the keyspace definition
-        // itself, we want to create it if it doesn't exist yet, but if it does exist, we don't want to modify it,
-        // because user can modify the definition to change the replication factor (#6016) and we don't want to
-        // override it. For the tables however, we have to deal with the fact that new version can add new columns
-        // (#8162 being an example), so even if the table definition exists, we still need to force the "current"
-        // version of the schema, the one the node will be expecting.
+        evolveSystemKeyspace(            TraceKeyspace.metadata(),             TraceKeyspace.GENERATION).ifPresent(changes::add);
+        evolveSystemKeyspace(SystemDistributedKeyspace.metadata(), SystemDistributedKeyspace.GENERATION).ifPresent(changes::add);
+        evolveSystemKeyspace(             AuthKeyspace.metadata(),              AuthKeyspace.GENERATION).ifPresent(changes::add);
 
-        KeyspaceMetadata defined = Schema.instance.getKeyspaceMetadata(expected.name);
-        // If the keyspace doesn't exist, create it
-        if (defined == null)
-        {
-            maybeAddKeyspace(expected);
-            defined = Schema.instance.getKeyspaceMetadata(expected.name);
-        }
-
-        // While the keyspace exists, it might miss table or have outdated one
-        // There is also the potential for a race, as schema migrations add the bare
-        // keyspace into Schema.instance before adding its tables, so double check that
-        // all the expected tables are present
-        for (TableMetadata expectedTable : expected.tables)
-        {
-            TableMetadata definedTable = defined.tables.get(expectedTable.name).orElse(null);
-            if (definedTable == null || !definedTable.equals(expectedTable))
-                MigrationManager.forceAnnounceNewTable(expectedTable);
-        }
+        if (!changes.isEmpty())
+            MigrationManager.announce(changes);
     }
 
     public boolean isJoined()
@@ -1578,24 +1539,11 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         BootStrapper bootstrapper = new BootStrapper(FBUtilities.getBroadcastAddressAndPort(), tokens, tokenMetadata);
         bootstrapper.addProgressListener(progressSupport);
         ListenableFuture<StreamState> bootstrapStream = bootstrapper.bootstrap(streamStateStore, useStrictConsistency && !replacing); // handles token update
-        Futures.addCallback(bootstrapStream, new FutureCallback<StreamState>()
-        {
-            @Override
-            public void onSuccess(StreamState streamState)
-            {
-                bootstrapFinished();
-                logger.info("Bootstrap completed! for the tokens {}", tokens);
-            }
-
-            @Override
-            public void onFailure(Throwable e)
-            {
-                logger.warn("Error during bootstrap.", e);
-            }
-        }, MoreExecutors.directExecutor());
         try
         {
             bootstrapStream.get();
+            bootstrapFinished();
+            logger.info("Bootstrap completed for tokens {}", tokens);
             return true;
         }
         catch (Throwable e)
@@ -3729,14 +3677,14 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             String keyspace = tablesByKeyspace.getKey();
             if (!Schema.instance.getKeyspaces().contains(keyspace))
             {
-                SystemKeyspace.clearSizeEstimates(keyspace);
+                SystemKeyspace.clearEstimates(keyspace);
             }
             else
             {
                 for (String table : tablesByKeyspace.getValue())
                 {
                     if (Schema.instance.getTableMetadataRef(keyspace, table) == null)
-                        SystemKeyspace.clearSizeEstimates(keyspace, table);
+                        SystemKeyspace.clearEstimates(keyspace, table);
                 }
             }
         }
@@ -3962,6 +3910,32 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         }
 
         return localDCPrimaryRanges;
+    }
+
+    public Collection<Range<Token>> getLocalPrimaryRange()
+    {
+        return getLocalPrimaryRangeForEndpoint(FBUtilities.getBroadcastAddressAndPort());
+    }
+
+    public Collection<Range<Token>> getLocalPrimaryRangeForEndpoint(InetAddressAndPort referenceEndpoint)
+    {
+        IEndpointSnitch snitch = DatabaseDescriptor.getEndpointSnitch();
+        TokenMetadata tokenMetadata = this.tokenMetadata.cloneOnlyTokenMap();
+        String dc = snitch.getDatacenter(referenceEndpoint);
+        Set<Token> tokens = new HashSet<>(tokenMetadata.getTokens(referenceEndpoint));
+
+        // filter tokens to the single DC
+        List<Token> filteredTokens = Lists.newArrayList();
+        for (Token token : tokenMetadata.sortedTokens())
+        {
+            InetAddressAndPort endpoint = tokenMetadata.getEndpoint(token);
+            if (dc.equals(snitch.getDatacenter(endpoint)))
+                filteredTokens.add(token);
+        }
+
+        return getAllRanges(filteredTokens).stream()
+                                           .filter(t -> tokens.contains(t.right))
+                                           .collect(Collectors.toList());
     }
 
     /**
@@ -5408,6 +5382,17 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         DatabaseDescriptor.setTombstoneFailureThreshold(threshold);
     }
 
+    public int getColumnIndexCacheSize()
+    {
+        return DatabaseDescriptor.getColumnIndexCacheSizeInKB();
+    }
+
+    public void setColumnIndexCacheSize(int cacheSizeInKB)
+    {
+        DatabaseDescriptor.setColumnIndexCacheSize(cacheSizeInKB);
+        logger.info("Updated column_index_cache_size_in_kb to {}", cacheSizeInKB);
+    }
+
     public int getBatchSizeFailureThreshold()
     {
         return DatabaseDescriptor.getBatchSizeFailThresholdInKB();
@@ -5444,7 +5429,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
     }
     public void disableAuditLog()
     {
-        AuditLogManager.getInstance().disableAuditLog();
+        AuditLogManager.instance.disableAuditLog();
         logger.info("Auditlog is disabled");
     }
 
@@ -5466,7 +5451,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         auditLogOptions.included_users = includedUsers != null ? includedUsers : DatabaseDescriptor.getAuditLoggingOptions().included_users;
         auditLogOptions.excluded_users = excludedUsers != null ? excludedUsers : DatabaseDescriptor.getAuditLoggingOptions().excluded_users;
 
-        AuditLogManager.getInstance().enableAuditLog(auditLogOptions);
+        AuditLogManager.instance.enable(auditLogOptions);
 
         logger.info("AuditLog is enabled with logger: [{}], included_keyspaces: [{}], excluded_keyspaces: [{}], " +
                     "included_categories: [{}], excluded_categories: [{}], included_users: [{}], "
@@ -5478,7 +5463,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
     public boolean isAuditLogEnabled()
     {
-        return AuditLogManager.getInstance().isAuditingEnabled();
+        return AuditLogManager.instance.isEnabled();
     }
 
     public String getCorruptedTombstoneStrategy()
@@ -5492,6 +5477,30 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         logger.info("Setting corrupted tombstone strategy to {}", strategy);
     }
 
+    @Override
+    public long getNativeTransportMaxConcurrentRequestsInBytes()
+    {
+        return Server.EndpointPayloadTracker.getGlobalLimit();
+    }
+
+    @Override
+    public void setNativeTransportMaxConcurrentRequestsInBytes(long newLimit)
+    {
+        Server.EndpointPayloadTracker.setGlobalLimit(newLimit);
+    }
+
+    @Override
+    public long getNativeTransportMaxConcurrentRequestsInBytesPerIp()
+    {
+        return Server.EndpointPayloadTracker.getEndpointLimit();
+    }
+
+    @Override
+    public void setNativeTransportMaxConcurrentRequestsInBytesPerIp(long newLimit)
+    {
+        Server.EndpointPayloadTracker.setEndpointLimit(newLimit);
+    }
+
     @VisibleForTesting
     public void shutdownServer()
     {
@@ -5499,5 +5508,33 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         {
             Runtime.getRuntime().removeShutdownHook(drainOnShutdown);
         }
+    }
+
+    @Override
+    public void enableFullQueryLogger(String path, String rollCycle, Boolean blocking, int maxQueueWeight, long maxLogSize, String archiveCommand, int maxArchiveRetries)
+    {
+        FullQueryLoggerOptions fqlOptions = DatabaseDescriptor.getFullQueryLogOptions();
+        path = path != null ? path : fqlOptions.log_dir;
+        rollCycle = rollCycle != null ? rollCycle : fqlOptions.roll_cycle;
+        blocking = blocking != null ? blocking : fqlOptions.block;
+        maxQueueWeight = maxQueueWeight != Integer.MIN_VALUE ? maxQueueWeight : fqlOptions.max_queue_weight;
+        maxLogSize = maxLogSize != Long.MIN_VALUE ? maxLogSize : fqlOptions.max_log_size;
+        archiveCommand = archiveCommand != null ? archiveCommand : fqlOptions.archive_command;
+        maxArchiveRetries = maxArchiveRetries != Integer.MIN_VALUE ? maxArchiveRetries : fqlOptions.max_archive_retries;
+
+        Preconditions.checkNotNull(path, "cassandra.yaml did not set log_dir and not set as parameter");
+        FullQueryLogger.instance.enable(Paths.get(path), rollCycle, blocking, maxQueueWeight, maxLogSize, archiveCommand, maxArchiveRetries);
+    }
+
+    @Override
+    public void resetFullQueryLogger()
+    {
+        FullQueryLogger.instance.reset(DatabaseDescriptor.getFullQueryLogOptions().log_dir);
+    }
+
+    @Override
+    public void stopFullQueryLogger()
+    {
+        FullQueryLogger.instance.stop();
     }
 }

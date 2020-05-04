@@ -443,13 +443,13 @@ class PendingRepairManager
             {
                 if (obsoleteSSTables)
                 {
-                    logger.info("Obsoleting transient repaired ssatbles");
+                    logger.info("Obsoleting transient repaired sstables for {}", sessionID);
                     Preconditions.checkState(Iterables.all(transaction.originals(), SSTableReader::isTransient));
                     transaction.obsoleteOriginals();
                 }
                 else
                 {
-                    logger.debug("Setting repairedAt to {} on {} for {}", repairedAt, transaction.originals(), sessionID);
+                    logger.info("Moving {} from pending to repaired with repaired at = {} and session id = {}", transaction.originals(), repairedAt, sessionID);
                     cfs.getCompactionStrategyManager().mutateRepaired(transaction.originals(), repairedAt, ActiveRepairService.NO_PENDING_REPAIR, false);
                 }
                 completed = true;

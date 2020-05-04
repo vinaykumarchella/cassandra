@@ -22,16 +22,19 @@ import java.util.Iterator;
 import java.util.Objects;
 
 import com.google.common.base.Function;
-import com.google.common.hash.Hasher;
 
 import org.apache.cassandra.db.DeletionPurger;
 import org.apache.cassandra.db.DeletionTime;
+import org.apache.cassandra.db.Digest;
 import org.apache.cassandra.db.LivenessInfo;
 import org.apache.cassandra.db.filter.ColumnFilter;
 import org.apache.cassandra.db.marshal.ByteType;
 import org.apache.cassandra.db.marshal.SetType;
+import org.apache.cassandra.db.partitions.PartitionStatisticsCollector;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.DroppedColumn;
+import org.apache.cassandra.utils.BiLongAccumulator;
+import org.apache.cassandra.utils.LongAccumulator;
 import org.apache.cassandra.utils.ObjectSizes;
 import org.apache.cassandra.utils.btree.BTree;
 
@@ -58,11 +61,6 @@ public class ComplexColumnData extends ColumnData implements Iterable<Cell>
         assert cells.length > 0 || !complexDeletion.isLive();
         this.cells = cells;
         this.complexDeletion = complexDeletion;
-    }
-
-    public boolean hasCells()
-    {
-        return !BTree.isEmpty(cells);
     }
 
     public int cellsCount()
@@ -106,6 +104,16 @@ public class ComplexColumnData extends ColumnData implements Iterable<Cell>
         return BTree.iterator(cells, BTree.Dir.DESC);
     }
 
+    public long accumulate(LongAccumulator<Cell> accumulator, long initialValue)
+    {
+        return BTree.accumulate(cells, accumulator, initialValue);
+    }
+
+    public <A> long accumulate(BiLongAccumulator<A, Cell> accumulator, A arg, long initialValue)
+    {
+        return BTree.accumulate(cells, accumulator, arg, initialValue);
+    }
+
     public int dataSize()
     {
         int size = complexDeletion.dataSize();
@@ -129,13 +137,13 @@ public class ComplexColumnData extends ColumnData implements Iterable<Cell>
             cell.validate();
     }
 
-    public void digest(Hasher hasher)
+    public void digest(Digest digest)
     {
         if (!complexDeletion.isLive())
-            complexDeletion.digest(hasher);
+            complexDeletion.digest(digest);
 
         for (Cell cell : this)
-            cell.digest(hasher);
+            cell.digest(digest);
     }
 
     public boolean hasInvalidDeletions()

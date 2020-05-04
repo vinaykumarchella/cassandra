@@ -44,6 +44,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.audit.AuditLogManager;
 import org.apache.cassandra.concurrent.ScheduledExecutors;
 import org.apache.cassandra.db.virtual.SystemViewsKeyspace;
 import org.apache.cassandra.db.virtual.VirtualKeyspaceRegistry;
@@ -62,6 +63,7 @@ import org.apache.cassandra.exceptions.StartupException;
 import org.apache.cassandra.gms.Gossiper;
 import org.apache.cassandra.io.FSError;
 import org.apache.cassandra.io.sstable.CorruptSSTableException;
+import org.apache.cassandra.io.sstable.SSTableHeaderFix;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.CassandraMetricsRegistry;
 import org.apache.cassandra.metrics.DefaultNameFactory;
@@ -202,6 +204,8 @@ public class CassandraDaemon
 
         NativeLibrary.tryMlockall();
 
+        CommitLog.instance.start();
+
         try
         {
             startupChecks.verify();
@@ -243,6 +247,8 @@ public class CassandraDaemon
         }
 
         setupVirtualKeyspaces();
+
+        SSTableHeaderFix.fixNonFrozenUDTIfUpgradeFrom30();
 
         // clean up debris in the rest of the keyspaces
         for (String keyspaceName : Schema.instance.getKeyspaces())
@@ -403,6 +409,8 @@ public class CassandraDaemon
                 }
             }
         }
+
+        AuditLogManager.instance.initialize();
 
         // schedule periodic background compaction task submission. this is simply a backstop against compactions stalling
         // due to scheduling errors or race conditions
