@@ -219,8 +219,6 @@ public interface StorageServiceMBean extends NotificationEmitter
     @Deprecated public List<InetAddress> getNaturalEndpoints(String keyspaceName, ByteBuffer key);
     public List<String> getNaturalEndpointsWithPort(String keysapceName, ByteBuffer key);
 
-    public List<String> getReplicas(String keyspaceName, String cf, String key);
-
     /**
      * @deprecated use {@link #takeSnapshot(String tag, Map options, String... entities)} instead.
      */
@@ -742,6 +740,7 @@ public interface StorageServiceMBean extends NotificationEmitter
     /** Clears the history of clients that have connected in the past **/
     void clearConnectionHistory();
     public void disableAuditLog();
+    public void enableAuditLog(String loggerName, Map<String, String> parameters, String includedKeyspaces, String excludedKeyspaces, String includedCategories, String excludedCategories, String includedUsers, String excludedUsers) throws ConfigurationException;
     public void enableAuditLog(String loggerName, String includedKeyspaces, String excludedKeyspaces, String includedCategories, String excludedCategories, String includedUsers, String excludedUsers) throws ConfigurationException;
     public boolean isAuditLogEnabled();
     public String getCorruptedTombstoneStrategy();
@@ -771,4 +770,15 @@ public interface StorageServiceMBean extends NotificationEmitter
      */
     public void stopFullQueryLogger();
 
+    /** Sets the initial allocation size of backing arrays for new RangeTombstoneList objects */
+    public void setInitialRangeTombstoneListAllocationSize(int size);
+
+    /** Returns the initial allocation size of backing arrays for new RangeTombstoneList objects */
+    public int getInitialRangeTombstoneListAllocationSize();
+
+    /** Sets the resize factor to use when growing/resizing a RangeTombstoneList */
+    public void setRangeTombstoneListResizeGrowthFactor(double growthFactor);
+
+    /** Returns the resize factor to use when growing/resizing a RangeTombstoneList */
+    public double getRangeTombstoneResizeListGrowthFactor();
 }

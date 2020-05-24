@@ -1176,6 +1176,22 @@ public class OutboundConnection
             {
                 ++connectionAttempts;
 
+                /*
+                 * Re-evaluate messagingVersion before re-attempting the connection in case
+                 * endpointToVersion were updated. This happens if the outbound connection
+                 * is made before the endpointToVersion table is initially constructed or out
+                 * of date (e.g. if outbound connections are established for gossip
+                 * as a result of an inbound connection) and can result in the wrong outbound
+                 * port being selected if configured with enable_legacy_ssl_storage_port=true.
+                 */
+                int knownMessagingVersion = messagingVersion();
+                if (knownMessagingVersion != messagingVersion)
+                {
+                    logger.trace("Endpoint version changed from {} to {} since connection initialized, updating.",
+                                 messagingVersion, knownMessagingVersion);
+                    messagingVersion = knownMessagingVersion;
+                }
+
                 settings = template;
                 if (messagingVersion > settings.acceptVersions.max)
                     messagingVersion = settings.acceptVersions.max;

@@ -846,8 +846,11 @@ public abstract class SSTableReader extends SSTable implements SelfRefCounted<SS
      */
     private void buildSummary(boolean recreateBloomFilter, boolean summaryLoaded, int samplingLevel) throws IOException
     {
-         if (!components.contains(Component.PRIMARY_INDEX))
-             return;
+        if (!components.contains(Component.PRIMARY_INDEX))
+            return;
+
+        if (logger.isDebugEnabled())
+            logger.debug("Attempting to build summary for {}", descriptor);
 
         // we read the positions in a BRAF so we don't have to worry about an entry spanning a mmap boundary.
         try (RandomAccessReader primaryIndex = RandomAccessReader.open(new File(descriptor.filenameFor(Component.PRIMARY_INDEX))))
@@ -906,7 +909,11 @@ public abstract class SSTableReader extends SSTable implements SelfRefCounted<SS
     {
         File summariesFile = new File(descriptor.filenameFor(Component.SUMMARY));
         if (!summariesFile.exists())
+        {
+            if (logger.isDebugEnabled())
+                logger.debug("SSTable Summary File {} does not exist", summariesFile.getAbsolutePath());
             return false;
+        }
 
         DataInputStream iStream = null;
         try
@@ -1170,7 +1177,6 @@ public abstract class SSTableReader extends SSTable implements SelfRefCounted<SS
             double effectiveInterval = indexSummary.getEffectiveIndexInterval();
 
             IndexSummary newSummary;
-            long oldSize = bytesOnDisk();
 
             // We have to rebuild the summary from the on-disk primary index in three cases:
             // 1. The sampling level went up, so we need to read more entries off disk
@@ -1194,11 +1200,6 @@ public abstract class SSTableReader extends SSTable implements SelfRefCounted<SS
 
             // Always save the resampled index
             saveSummary(newSummary);
-
-            // The new size will be added in Transactional.commit() as an updated SSTable, more details: CASSANDRA-13738
-            StorageMetrics.load.dec(oldSize);
-            parent.metric.liveDiskSpaceUsed.dec(oldSize);
-            parent.metric.totalDiskSpaceUsed.dec(oldSize);
 
             return cloneAndReplace(first, OpenReason.METADATA_CHANGE, newSummary);
         }
