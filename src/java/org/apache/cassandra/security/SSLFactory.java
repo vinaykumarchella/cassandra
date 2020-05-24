@@ -130,6 +130,11 @@ public final class SSLFactory
     private static boolean isHotReloadingInitialized = false;
 
     /**
+     * Pluggable SSLContext Builder
+     */
+    private static volatile SSLContextProvider sslContextProvider = new SSLContextBuilder();
+
+    /**
      * Helper class for hot reloading SSL Contexts
      */
     private static class HotReloadableFile
@@ -167,22 +172,7 @@ public final class SSLFactory
     @SuppressWarnings("resource")
     public static SSLContext createSSLContext(EncryptionOptions options, boolean buildTruststore) throws IOException
     {
-        TrustManager[] trustManagers = null;
-        if (buildTruststore)
-            trustManagers = buildTrustManagerFactory(options).getTrustManagers();
-
-        KeyManagerFactory kmf = buildKeyManagerFactory(options);
-
-        try
-        {
-            SSLContext ctx = SSLContext.getInstance(options.protocol);
-            ctx.init(kmf.getKeyManagers(), trustManagers, null);
-            return ctx;
-        }
-        catch (Exception e)
-        {
-            throw new IOException("Error creating/initializing the SSL Context", e);
-        }
+        return sslContextProvider.buildSSLContext(options, buildTruststore);
     }
 
     static TrustManagerFactory buildTrustManagerFactory(EncryptionOptions options) throws IOException
@@ -289,37 +279,7 @@ public final class SSLFactory
     static SslContext createNettySslContext(EncryptionOptions options, boolean buildTruststore,
                                             SocketType socketType, boolean useOpenSsl) throws IOException
     {
-        /*
-            There is a case where the netty/openssl combo might not support using KeyManagerFactory. specifically,
-            I've seen this with the netty-tcnative dynamic openssl implementation. using the netty-tcnative static-boringssl
-            works fine with KeyManagerFactory. If we want to support all of the netty-tcnative options, we would need
-            to fall back to passing in a file reference for both a x509 and PKCS#8 private key file in PEM format (see
-            {@link SslContextBuilder#forServer(File, File, String)}). However, we are not supporting that now to keep
-            the config/yaml API simple.
-         */
-        KeyManagerFactory kmf = buildKeyManagerFactory(options);
-        SslContextBuilder builder;
-        if (socketType == SocketType.SERVER)
-        {
-            builder = SslContextBuilder.forServer(kmf);
-            builder.clientAuth(options.require_client_auth ? ClientAuth.REQUIRE : ClientAuth.NONE);
-        }
-        else
-        {
-            builder = SslContextBuilder.forClient().keyManager(kmf);
-        }
-
-        builder.sslProvider(useOpenSsl ? SslProvider.OPENSSL : SslProvider.JDK);
-
-        // only set the cipher suites if the opertor has explicity configured values for it; else, use the default
-        // for each ssl implemention (jdk or openssl)
-        if (options.cipher_suites != null && !options.cipher_suites.isEmpty())
-            builder.ciphers(options.cipher_suites, SupportedCipherSuiteFilter.INSTANCE);
-
-        if (buildTruststore)
-            builder.trustManager(buildTrustManagerFactory(options));
-
-        return builder.build();
+     return sslContextProvider.buildNettySSLContext(options, buildTruststore, socketType, useOpenSsl);
     }
 
     /**
@@ -462,6 +422,65 @@ public final class SSLFactory
             result += 31 * encryptionOptions.hashCode();
             result += 31 * Boolean.hashCode(useOpenSSL);
             return result;
+        }
+    }
+
+    static class SSLContextBuilder implements SSLContextProvider
+    {
+
+        public SslContext buildNettySSLContext(EncryptionOptions options, boolean buildTruststore, SocketType socketType, boolean useOpenSsl) throws IOException
+        {
+             /*
+            There is a case where the netty/openssl combo might not support using KeyManagerFactory. specifically,
+            I've seen this with the netty-tcnative dynamic openssl implementation. using the netty-tcnative static-boringssl
+            works fine with KeyManagerFactory. If we want to support all of the netty-tcnative options, we would need
+            to fall back to passing in a file reference for both a x509 and PKCS#8 private key file in PEM format (see
+            {@link SslContextBuilder#forServer(File, File, String)}). However, we are not supporting that now to keep
+            the config/yaml API simple.
+         */
+            KeyManagerFactory kmf = buildKeyManagerFactory(options);
+            SslContextBuilder builder;
+            if (socketType == SocketType.SERVER)
+            {
+                builder = SslContextBuilder.forServer(kmf);
+                builder.clientAuth(options.require_client_auth ? ClientAuth.REQUIRE : ClientAuth.NONE);
+            }
+            else
+            {
+                builder = SslContextBuilder.forClient().keyManager(kmf);
+            }
+
+            builder.sslProvider(useOpenSsl ? SslProvider.OPENSSL : SslProvider.JDK);
+
+            // only set the cipher suites if the opertor has explicity configured values for it; else, use the default
+            // for each ssl implemention (jdk or openssl)
+            if (options.cipher_suites != null && !options.cipher_suites.isEmpty())
+                builder.ciphers(options.cipher_suites, SupportedCipherSuiteFilter.INSTANCE);
+
+            if (buildTruststore)
+                builder.trustManager(buildTrustManagerFactory(options));
+
+            return builder.build();
+        }
+
+        public SSLContext buildSSLContext(EncryptionOptions options, boolean buildTruststore) throws IOException
+        {
+            TrustManager[] trustManagers = null;
+            if (buildTruststore)
+                trustManagers = buildTrustManagerFactory(options).getTrustManagers();
+
+            KeyManagerFactory kmf = buildKeyManagerFactory(options);
+
+            try
+            {
+                SSLContext ctx = SSLContext.getInstance(options.protocol);
+                ctx.init(kmf.getKeyManagers(), trustManagers, null);
+                return ctx;
+            }
+            catch (Exception e)
+            {
+                throw new IOException("Error creating/initializing the SSL Context", e);
+            }
         }
     }
 }
