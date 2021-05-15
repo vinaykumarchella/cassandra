@@ -42,7 +42,16 @@ Audit logging captures following events
 Limitations
 ^^^^^^^^^^^
 
-Executing prepared statements will log the query as provided by the client in the prepare call, along with the execution time stamp and all other attributes (see below). Actual values bound for prepared statement execution will not show up in the audit log.
+- Executing prepared statements will log the query as provided by the client in the prepare call, along with the execution time stamp and all other attributes (see below). Actual values bound for prepared statement execution will not show up in the audit log.
+- Executing DCL(`ROLE <https://cassandra.apache.org/doc/latest/cql/security.html#database-roles>`_ and `USER <https://cassandra.apache.org/doc/latest/cql/security.html#users>`_) queries logs query statements with passwords in plaintext format in audit log files until `CASSANDRA-16669 <https://issues.apache.org/jira/browse/CASSANDRA-16669>`_ is closed. For example, see below ``CREATE ROLE`` and ``AUDIT ROLE`` CQL statements with passwords in plaintext format in audit logs.
+
+::
+
+	Type: audit
+	LogMessage: user:cassandra|host:localhost/127.0.0.1:7000|source:/127.0.0.1|port:51908|timestamp:1620190525376|type:CREATE_ROLE|category:DCL|operation:CREATE ROLE bob WITH PASSWORD = 'password_b' AND LOGIN = true AND SUPERUSER = true;
+	Type: audit
+	LogMessage: user:cassandra|host:localhost/127.0.0.1:7000|source:/127.0.0.1|port:51908|timestamp:1620190532462|type:ALTER_ROLE|category:DCL|operation:ALTER ROLE bob WITH PASSWORD = 'PASSWORD_B' AND SUPERUSER = false;
+
 
 What does it log
 ^^^^^^^^^^^^^^^^^^^
